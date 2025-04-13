@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 
 class OfflineBanner extends StatelessWidget {
-  const OfflineBanner({Key? key}) : super(key: key);
+  final bool isAuthOffline;
+  
+  const OfflineBanner({
+    Key? key,
+    this.isAuthOffline = false,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -10,7 +15,7 @@ class OfflineBanner extends StatelessWidget {
       color: const Color(0xFFFF9800), // Orange color
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Row(
-        children: const [
+        children: [
           Icon(
             Icons.wifi_off,
             color: Color(0xFFFFFFFF), // White color
@@ -19,8 +24,10 @@ class OfflineBanner extends StatelessWidget {
           SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Vous êtes hors ligne. Les incidents seront enregistrés localement et synchronisés ultérieurement.',
-              style: TextStyle(
+              isAuthOffline
+                ? 'Mode hors ligne (authentification). Vous pouvez consulter et créer des incidents qui seront synchronisés lorsque vous serez en ligne.'
+                : 'Vous êtes hors ligne. Les incidents seront enregistrés localement et synchronisés ultérieurement.',
+              style: const TextStyle(
                 color: Color(0xFFFFFFFF), // White color
                 fontSize: 12,
               ),

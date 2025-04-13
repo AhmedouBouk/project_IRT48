@@ -29,8 +29,9 @@ class LocalDatabase {
     
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Increased version number for migration
       onCreate: _createDB,
+      onUpgrade: _upgradeDB, // Add migration handler
     );
   }
 
@@ -43,6 +44,7 @@ class LocalDatabase {
       title TEXT NOT NULL,
       description TEXT NOT NULL,
       photo TEXT,
+      audio_file TEXT,
       latitude REAL NOT NULL,
       longitude REAL NOT NULL,
       address TEXT,
@@ -152,6 +154,40 @@ class LocalDatabase {
       await db.delete('incidents');
     } catch (e) {
       print('Error clearing incidents: $e');
+    }
+  }
+  
+  // Handle database migrations
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Migration from version 1 to 2: add audio_file column
+      try {
+        await db.execute('ALTER TABLE incidents ADD COLUMN audio_file TEXT');
+        print('Database migration successful: added audio_file column');
+      } catch (e) {
+        print('Error during database migration: $e');
+        // If migration fails, recreate the table (this will lose data, but it's a fallback)
+        try {
+          await db.execute('DROP TABLE IF EXISTS incidents_old');
+          await db.execute('ALTER TABLE incidents RENAME TO incidents_old');
+          await _createDB(db, newVersion);
+          
+          // Copy data from old table to new table
+          await db.execute('''
+          INSERT INTO incidents 
+          (id, local_id, incident_type, title, description, photo, latitude, longitude, 
+          address, created_at, updated_at, status, is_voice_description, user_username, is_synced)
+          SELECT id, local_id, incident_type, title, description, photo, latitude, longitude, 
+          address, created_at, updated_at, status, is_voice_description, user_username, is_synced
+          FROM incidents_old
+          ''');
+          
+          await db.execute('DROP TABLE incidents_old');
+          print('Database recreation successful after migration failure');
+        } catch (recreateError) {
+          print('Error recreating database: $recreateError');
+        }
+      }
     }
   }
 }

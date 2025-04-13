@@ -8,6 +8,7 @@ class Incident {
   final String title;
   final String description;
   final String? photo;
+  final String? audioFile; // Path to audio file for voice descriptions
   final double latitude;
   final double longitude;
   final String? address;
@@ -51,6 +52,7 @@ class Incident {
     required this.title,
     required this.description,
     this.photo,
+    this.audioFile,
     required this.latitude,
     required this.longitude,
     this.address,
@@ -70,6 +72,7 @@ class Incident {
       title: json['title'],
       description: json['description'],
       photo: json['photo'],
+      audioFile: json['audio_file'],
       latitude: json['latitude'],
       longitude: json['longitude'],
       address: json['address'],
@@ -94,6 +97,7 @@ class Incident {
       title: map['title'],
       description: map['description'],
       photo: map['photo'],
+      audioFile: map['audio_file'],
       latitude: map['latitude'],
       longitude: map['longitude'],
       address: map['address'],
@@ -118,6 +122,7 @@ class Incident {
       'title': title,
       'description': description,
       'photo': photo,
+      'audio_file': audioFile,
       'latitude': latitude,
       'longitude': longitude,
       'address': address,
@@ -134,6 +139,7 @@ class Incident {
       'title': title,
       'description': description,
       'photo': photo,
+      'audio_file': audioFile,
       'latitude': latitude,
       'longitude': longitude,
       'address': address,
@@ -153,6 +159,7 @@ class Incident {
     String? title,
     String? description,
     String? photo,
+    String? audioFile,
     double? latitude,
     double? longitude,
     String? address,
@@ -170,6 +177,7 @@ class Incident {
       title: title ?? this.title,
       description: description ?? this.description,
       photo: photo ?? this.photo,
+      audioFile: audioFile ?? this.audioFile,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       address: address ?? this.address,

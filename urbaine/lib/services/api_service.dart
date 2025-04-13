@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -73,18 +74,25 @@ class ApiService {
 
   Future<User> getCurrentUser() async {
     final token = await getAccessToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/users/me/'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/users/me/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5), onTimeout: () {
+        throw TimeoutException('API request timed out');
+      });
 
-    if (response.statusCode == 200) {
-      return User.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to get user profile');
+      if (response.statusCode == 200) {
+        return User.fromJson(jsonDecode(response.body));
+      } else {
+        throw Exception('Failed to get user profile: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error getting user profile: $e');
+      throw Exception('Failed to get user profile: $e');
     }
   }
 
@@ -114,19 +122,26 @@ class ApiService {
   // Incidents endpoints
   Future<List<Incident>> getIncidents() async {
     final token = await getAccessToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/incidents/'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/incidents/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5), onTimeout: () {
+        throw TimeoutException('API request timed out');
+      });
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((json) => Incident.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to load incidents');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => Incident.fromJson(json)).toList();
+      } else {
+        throw Exception('Failed to load incidents: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error loading incidents: $e');
+      throw Exception('Failed to load incidents: $e');
     }
   }
 

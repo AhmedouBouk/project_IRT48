@@ -6,7 +6,7 @@ import '../../providers/connectivity_provider.dart';
 import '../../widgets/offline_banner.dart';
 import '../incident/create_incident_screen.dart';
 import '../incident/incident_history_screen.dart';
-import 'incident_map_screen.dart';
+import 'offline_incidents_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -18,16 +18,28 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final List<Widget> _pages = [
-    const IncidentMapScreen(),
     const IncidentHistoryScreen(),
+    const OfflineIncidentsScreen(),
   ];
 
   @override
   void initState() {
     super.initState();
-    // Charger les incidents au démarrage
+    // Charger les incidents au démarrage avec un timeout
     Future.microtask(() {
-      Provider.of<IncidentProvider>(context, listen: false).loadIncidents();
+      final incidentProvider = Provider.of<IncidentProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Update the offline mode status before loading incidents
+      incidentProvider.setAuthProvider(authProvider);
+      incidentProvider.loadIncidents();
+      
+      // Set a timeout to prevent infinite loading
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && incidentProvider.isLoading) {
+          incidentProvider.forceCompleteLoading();
+        }
+      });
     });
   }
 
@@ -36,13 +48,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final connectivityProvider = Provider.of<ConnectivityProvider>(context);
     final incidentProvider = Provider.of<IncidentProvider>(context);
+    
+    // Update offline status based on both connectivity and auth provider
+    final bool isOffline = !connectivityProvider.isOnline || authProvider.isOfflineMode;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Urban Incident Reporter'),
         actions: [
-          // Bouton de synchronisation (visible uniquement hors ligne)
-          if (!connectivityProvider.isOnline)
+          // Bouton de synchronisation (visible uniquement hors ligne ou en mode offline)
+          if (isOffline)
             IconButton(
               icon: const Icon(Icons.sync),
               tooltip: 'Synchroniser les données',
@@ -92,8 +107,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           // Bannière hors ligne
-          if (!connectivityProvider.isOnline)
-            const OfflineBanner(),
+          if (isOffline)
+            OfflineBanner(
+              isAuthOffline: authProvider.isOfflineMode,
+            ),
           
           // Contenu principal
           Expanded(
@@ -110,12 +127,12 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Carte',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.history),
             label: 'Historique',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.cloud_off),
+            label: 'Hors ligne',
           ),
         ],
       ),

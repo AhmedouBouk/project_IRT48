@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../screens/home/home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -68,7 +69,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (loginSuccess) {
         // Si la connexion réussit, naviguer vers la page d'accueil
         if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+          // Utiliser pushAndRemoveUntil avec un widget au lieu d'une route nommée
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false
+          );
         }
       } else {
         // Si la connexion échoue, rediriger vers l'écran de connexion

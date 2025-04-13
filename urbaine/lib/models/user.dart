@@ -20,10 +20,21 @@ class User {
       id: json['id'],
       username: json['username'],
       email: json['email'],
-      firstName: json['first_name'],
-      lastName: json['last_name'],
-      role: json['role'],
+      firstName: json['first_name'] ?? '',
+      lastName: json['last_name'] ?? '',
+      role: json['role'] ?? 'citizen',
     );
+  }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      'email': email,
+      'first_name': firstName,
+      'last_name': lastName,
+      'role': role,
+    };
   }
 
   bool get isAdmin => role == 'admin';

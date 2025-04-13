@@ -1,10 +1,12 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../../models/incident.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../services/location_service.dart';
@@ -22,26 +24,28 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
   final _descriptionController = TextEditingController();
   
   final LocationService _locationService = LocationService();
-  final stt.SpeechToText _speech = stt.SpeechToText();
   final ImagePicker _picker = ImagePicker();
+  final Record _audioRecorder = Record();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   
   XFile? _photoFile;
   String _selectedIncidentType = 'fire';
   double _latitude = 0.0;
   double _longitude = 0.0;
   String? _address;
-  bool _isVoiceDescription = false;
-  bool _isListening = false;
+  String _descriptionType = 'text'; // 'text' or 'audio'
+  bool _isRecording = false;
+  bool _isPlaying = false;
   bool _isLocationLoading = true;
   bool _isSubmitting = false;
   String? _errorMessage;
-  bool _isSpeechAvailable = false;
+  String? _audioPath;
+  Timer? _recordingTimer;
+  Duration _recordDuration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    // Initialisation simplifiée
-    _initSpeechSimple();
     _getCurrentLocation();
   }
 
@@ -49,36 +53,96 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _stopRecording();
+    _stopPlaying();
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
+    _recordingTimer?.cancel();
     super.dispose();
   }
 
-  // Version simplifiée de l'initialisation de la reconnaissance vocale
-  Future<void> _initSpeechSimple() async {
+  // Start recording audio
+  Future<void> _startRecording() async {
     try {
-      bool available = await _speech.initialize(
-        onStatus: (status) {
-          if (status == 'done') {
-            setState(() {
-              _isListening = false;
-            });
-          }
-        },
-        onError: (error) {
+      if (await _audioRecorder.hasPermission()) {
+        // Create a temporary file path
+        final directory = await getTemporaryDirectory();
+        final path = '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        
+        // Configure recorder
+        await _audioRecorder.start(path: path);
+        
+        // Start timer to track recording duration
+        _recordDuration = Duration.zero;
+        _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
           setState(() {
-            _isListening = false;
+            _recordDuration = Duration(seconds: timer.tick);
           });
-        },
+        });
+        
+        setState(() {
+          _isRecording = true;
+          _audioPath = path;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Permission d\'enregistrement refusée')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de l\'enregistrement: $e')),
       );
+    }
+  }
+
+  // Stop recording
+  Future<void> _stopRecording() async {
+    if (!_isRecording) return;
+    
+    _recordingTimer?.cancel();
+    await _audioRecorder.stop();
+    
+    setState(() {
+      _isRecording = false;
+    });
+  }
+  
+  // Play recorded audio
+  Future<void> _playRecording() async {
+    if (_audioPath == null) return;
+    
+    try {
+      await _audioPlayer.play(DeviceFileSource(_audioPath!));
       
       setState(() {
-        _isSpeechAvailable = available;
+        _isPlaying = true;
+      });
+      
+      // Listen for playback completion
+      _audioPlayer.onPlayerComplete.listen((event) {
+        setState(() {
+          _isPlaying = false;
+        });
       });
     } catch (e) {
-      // Ignorer l'erreur, la fonctionnalité sera simplement désactivée
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur de lecture: $e')),
+      );
       setState(() {
-        _isSpeechAvailable = false;
+        _isPlaying = false;
       });
     }
+  }
+  
+  // Stop playing
+  Future<void> _stopPlaying() async {
+    if (!_isPlaying) return;
+    
+    await _audioPlayer.stop();
+    setState(() {
+      _isPlaying = false;
+    });
   }
 
   // Obtenir la localisation actuelle
@@ -127,109 +191,113 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
     }
   }
 
-  // Démarrer ou arrêter la reconnaissance vocale
-  void _toggleListening() {
-    if (!_isListening) {
-      _startListening();
-    } else {
-      _stopListening();
-    }
-  }
-
-  Future<void> _startListening() async {
-    if (_isSpeechAvailable) {
-      try {
-        setState(() {
-          _isListening = true;
-          _isVoiceDescription = true;
-        });
-        
-        await _speech.listen(
-          onResult: (result) {
-            setState(() {
-              _descriptionController.text = result.recognizedWords;
-            });
-          },
-        );
-      } catch (e) {
-        setState(() {
-          _isListening = false;
-        });
-      }
-    }
-  }
-
-  void _stopListening() {
-    _speech.stop();
-    setState(() {
-      _isListening = false;
-    });
-  }
-
   // Soumettre le formulaire
   Future<void> _submitForm() async {
-    if (_formKey.currentState?.validate() != true) return;
-    if (_photoFile == null) {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    // Check if we have a description (either text or audio)
+    if (_descriptionType == 'text' && _descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez prendre ou sélectionner une photo'),
+          content: Text('Veuillez fournir une description textuelle'),
+          backgroundColor: Colors.red,
         ),
       );
       return;
     }
-
+    
+    if (_descriptionType == 'audio' && _audioPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez enregistrer un message audio'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
     setState(() {
       _isSubmitting = true;
-      _errorMessage = null;
     });
-
+    
     try {
-      final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
+      if (_photoFile == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veuillez prendre ou sélectionner une photo'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() {
+          _isSubmitting = false;
+        });
+        return;
+      }
+      
       final incidentProvider = Provider.of<IncidentProvider>(context, listen: false);
+      final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
+      
+      // Prepare description based on type
+      String description;
+      if (_descriptionType == 'text') {
+        description = _descriptionController.text.trim();
+      } else {
+        // For audio, we'll use a placeholder and the audio file path
+        description = "[AUDIO_DESCRIPTION]";
+      }
       
       final success = await incidentProvider.createIncident(
         incidentType: _selectedIncidentType,
         title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
+        description: description,
         photoFile: _photoFile!,
         latitude: _latitude,
         longitude: _longitude,
         address: _address,
-        isVoiceDescription: _isVoiceDescription,
+        isVoiceDescription: _descriptionType == 'audio',
+        audioPath: _descriptionType == 'audio' ? _audioPath : null,
       );
       
       if (success) {
-        Navigator.pop(context);
+        if (!mounted) return;
         
-        // Message différent selon si nous sommes en ligne ou non
-        final bool isOnline = connectivityProvider.isOnline;
-        final String message = isOnline 
-          ? 'Incident signalé avec succès'
-          : 'Incident enregistré localement. Il sera synchronisé lorsque vous serez en ligne.';
-          
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(message),
-            duration: const Duration(seconds: 3),
-            action: !isOnline ? SnackBarAction(
-              label: 'Fermer',
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ) : null,
+            content: Text(
+              connectivityProvider.isOnline
+                  ? 'Incident signalé avec succès!'
+                  : 'Incident enregistré localement. Il sera synchronisé lorsque vous serez en ligne.',
+            ),
+            backgroundColor: Colors.green,
           ),
         );
+        
+        Navigator.pop(context);
       } else {
+        if (!mounted) return;
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la création de l\'incident'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
         setState(() {
-          _errorMessage = 'Erreur lors de la création de l\'incident';
           _isSubmitting = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Une erreur s\'est produite. Veuillez réessayer.';
-        _isSubmitting = false;
-      });
     }
   }
 
@@ -390,55 +458,155 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text(
+                      'Description de l\'incident',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Description type selector
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Description',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Texte'),
+                            value: 'text',
+                            groupValue: _descriptionType,
+                            onChanged: (value) {
+                              setState(() {
+                                _descriptionType = value!;
+                              });
+                            },
                           ),
                         ),
-                        IconButton(
-                          icon: Icon(
-                            _isListening ? Icons.mic : Icons.mic_none,
-                            color: _isListening 
-                                ? Colors.red 
-                                : (_isSpeechAvailable ? null : Colors.grey.withOpacity(0.5)),
+                        Expanded(
+                          child: RadioListTile<String>(
+                            title: const Text('Audio'),
+                            value: 'audio',
+                            groupValue: _descriptionType,
+                            onChanged: (value) {
+                              setState(() {
+                                _descriptionType = value!;
+                              });
+                            },
                           ),
-                          onPressed: _isSpeechAvailable ? _toggleListening : null,
-                          tooltip: _isSpeechAvailable 
-                              ? 'Dictée vocale' 
-                              : 'Reconnaissance vocale non disponible',
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _descriptionController,
-                      maxLines: 5,
-                      decoration: const InputDecoration(
-                        hintText: 'Décrivez l\'incident en détail',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Veuillez entrer une description';
-                        }
-                        return null;
-                      },
-                    ),
-                    if (_isListening)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Écoute en cours... Parlez maintenant',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.secondary,
-                            fontStyle: FontStyle.italic,
-                          ),
+                    
+                    // Text description
+                    if (_descriptionType == 'text')
+                      TextFormField(
+                        controller: _descriptionController,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          hintText: 'Décrivez l\'incident en détail',
+                          border: OutlineInputBorder(),
                         ),
+                        validator: (value) {
+                          if (_descriptionType == 'text' && (value == null || value.trim().isEmpty)) {
+                            return 'Veuillez fournir une description';
+                          }
+                          return null;
+                        },
+                      ),
+                    
+                    // Audio description
+                    if (_descriptionType == 'audio')
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          
+                          // Audio recording controls
+                          if (_audioPath == null)
+                            Center(
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.mic),
+                                label: const Text('Commencer l\'enregistrement'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                ),
+                                onPressed: _isRecording ? null : _startRecording,
+                              ),
+                            )
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow),
+                                    label: Text(_isPlaying ? 'Arrêter' : 'Écouter', overflow: TextOverflow.ellipsis),
+                                    onPressed: _isPlaying ? _stopPlaying : _playRecording,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.delete),
+                                    label: const Text('Supprimer', overflow: TextOverflow.ellipsis),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _audioPath = null;
+                                      });
+                                    },
+                                  ),
+                                )
+                              ],
+                            ),
+                          
+                          // Recording in progress UI
+                          if (_isRecording)
+                            Column(
+                              children: [
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Enregistrement en cours...',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${_recordDuration.inMinutes.toString().padLeft(2, '0')}:${(_recordDuration.inSeconds % 60).toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 24,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.stop),
+                                  label: const Text('Arrêter l\'enregistrement'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                  ),
+                                  onPressed: _stopRecording,
+                                ),
+                              ],
+                            ),
+                          
+                          if (_audioPath != null && !_isRecording)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Enregistrement audio sauvegardé',
+                                style: TextStyle(
+                                  color: Colors.green[700],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                   ],
                 ),
@@ -513,17 +681,27 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
                       )
                     else
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('Prendre une photo'),
-                            onPressed: () => _getImage(ImageSource.camera),
+                          // Wrap each button in an Expanded widget to prevent overflow
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.camera_alt, size: 18),
+                                label: const Text('Photo', overflow: TextOverflow.ellipsis),
+                                onPressed: () => _getImage(ImageSource.camera),
+                              ),
+                            ),
                           ),
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('Galerie'),
-                            onPressed: () => _getImage(ImageSource.gallery),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8.0),
+                              child: ElevatedButton.icon(
+                                icon: const Icon(Icons.photo_library, size: 18),
+                                label: const Text('Galerie', overflow: TextOverflow.ellipsis),
+                                onPressed: () => _getImage(ImageSource.gallery),
+                              ),
+                            ),
                           ),
                         ],
                       ),

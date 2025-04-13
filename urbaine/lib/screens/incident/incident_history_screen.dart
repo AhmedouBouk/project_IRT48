@@ -14,14 +14,39 @@ class IncidentHistoryScreen extends StatefulWidget {
 
 class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   @override
+  void initState() {
+    super.initState();
+    // Load incidents with a timeout to prevent infinite loading
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        final provider = Provider.of<IncidentProvider>(context, listen: false);
+        if (provider.isLoading) {
+          // Force loading to complete if it's taking too long
+          provider.forceCompleteLoading();
+        }
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final connectivityProvider = Provider.of<ConnectivityProvider>(context);
     final bool isOffline = !connectivityProvider.isOnline;
     
     return Consumer<IncidentProvider>(
       builder: (context, incidentProvider, _) {
+        // Show loading indicator for a maximum of 3 seconds
         if (incidentProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Chargement en cours...'),
+              ],
+            ),
+          );
         }
         
         final incidents = incidentProvider.incidents;
@@ -38,25 +63,37 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
             if (hasOfflineIncidents)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Filtrer:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    // First row with filter switch
+                    Row(
+                      children: [
+                        const Text(
+                          'Filtrer:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        // Switch to toggle offline-only filter
+                        Switch(
+                          value: incidentProvider.showOnlyOffline,
+                          onChanged: (value) {
+                            incidentProvider.showOnlyOffline = value;
+                          },
+                        ),
+                        Expanded(
+                          child: const Text(
+                            'Incidents hors ligne uniquement',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    // Switch to toggle offline-only filter
-                    Switch(
-                      value: incidentProvider.showOnlyOffline,
-                      onChanged: (value) {
-                        incidentProvider.showOnlyOffline = value;
-                      },
-                    ),
-                    const Text('Incidents hors ligne uniquement'),
                     
-                    // If offline, show sync button
+                    // Second row with sync button if offline
                     if (isOffline && hasOfflineIncidents)
-                      Expanded(
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: ElevatedButton.icon(

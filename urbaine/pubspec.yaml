@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.2
+  sdk: '>=3.0.0 <4.0.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -59,10 +59,15 @@ dependencies:
   # Voice
   flutter_tts:
   speech_to_text: 
+  record: ^4.4.4
+  audioplayers: ^5.2.1
   
   # Utils
   intl: 
   uuid: 
+  flutter_native_splash: 
+  lottie: 
+  animated_splash_screen: 
 
 dev_dependencies:
   flutter_test:
@@ -80,6 +85,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  assets:
+    - assets/animations/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

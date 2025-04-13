@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
-import 'screens/splash_screen.dart';
+import 'screens/animated_splash_screen.dart';
 
 class UrbanIncidentApp extends StatelessWidget {
   const UrbanIncidentApp({Key? key}) : super(key: key);
@@ -33,7 +33,7 @@ class UrbanIncidentApp extends StatelessWidget {
       home: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           if (authProvider.isInitializing) {
-            return const SplashScreen();
+            return const AnimatedSplashScreen();
           }
           if (authProvider.isAuthenticated) {
             return const HomeScreen();
