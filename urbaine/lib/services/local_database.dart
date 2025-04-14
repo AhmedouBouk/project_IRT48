@@ -128,6 +128,19 @@ class LocalDatabase {
     }
   }
   
+  Future<void> deleteIncidentById(int id) async {
+    try {
+      final db = await database;
+      await db.delete(
+        'incidents',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      print('Error deleting incident by ID: $e');
+    }
+  }
+  
   Future<Incident?> getIncidentByLocalId(String localId) async {
     try {
       final db = await database;

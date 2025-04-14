@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../providers/auth_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/connectivity_provider.dart';
@@ -25,16 +26,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Charger les incidents au démarrage avec un timeout
     Future.microtask(() {
       final incidentProvider = Provider.of<IncidentProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      // Update the offline mode status before loading incidents
+
       incidentProvider.setAuthProvider(authProvider);
       incidentProvider.loadIncidents();
-      
-      // Set a timeout to prevent infinite loading
+
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted && incidentProvider.isLoading) {
           incidentProvider.forceCompleteLoading();
@@ -48,15 +46,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final connectivityProvider = Provider.of<ConnectivityProvider>(context);
     final incidentProvider = Provider.of<IncidentProvider>(context);
-    
-    // Update offline status based on both connectivity and auth provider
+
     final bool isOffline = !connectivityProvider.isOnline || authProvider.isOfflineMode;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Urban Incident Reporter'),
         actions: [
-          // Bouton de synchronisation (visible uniquement hors ligne ou en mode offline)
+          // Sync button if offline
           if (isOffline)
             IconButton(
               icon: const Icon(Icons.sync),
@@ -73,21 +70,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
             ),
-          // Bouton de déconnexion
+          // Logout button
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Se déconnecter',
             onPressed: () {
               showDialog(
                 context: context,
-                builder: (context) => AlertDialog(
+                builder: (_) => AlertDialog(
                   title: const Text('Déconnexion'),
                   content: const Text('Voulez-vous vraiment vous déconnecter ?'),
                   actions: [
                     TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
+                      onPressed: () => Navigator.pop(context),
                       child: const Text('Annuler'),
                     ),
                     TextButton(
@@ -106,13 +101,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Bannière hors ligne
           if (isOffline)
             OfflineBanner(
               isAuthOffline: authProvider.isOfflineMode,
             ),
-          
-          // Contenu principal
           Expanded(
             child: _pages[_currentIndex],
           ),
@@ -120,11 +112,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: (index) => setState(() {
+          _currentIndex = index;
+        }),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.history),
@@ -141,9 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const CreateIncidentScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const CreateIncidentScreen()),
           );
         },
         child: const Icon(Icons.add),

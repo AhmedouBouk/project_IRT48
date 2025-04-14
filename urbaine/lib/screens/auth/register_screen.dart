@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../providers/auth_provider.dart';
 import '../../screens/home/home_screen.dart';
 
@@ -36,7 +37,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
-    if (_formKey.currentState?.validate() != true) return;
+    if (!_formKey.currentState!.validate()) return;
 
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() {
@@ -60,30 +61,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     if (success) {
-      // Après l'inscription réussie, essayer de connecter l'utilisateur automatiquement
       final loginSuccess = await authProvider.login(
         _usernameController.text.trim(),
         _passwordController.text,
       );
-      
       if (loginSuccess) {
-        // Si la connexion réussit, naviguer vers la page d'accueil
         if (mounted) {
-          // Utiliser pushAndRemoveUntil avec un widget au lieu d'une route nommée
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
           );
         }
       } else {
-        // Si la connexion échoue, rediriger vers l'écran de connexion
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Inscription réussie. Veuillez vous connecter.'),
-            ),
+            const SnackBar(content: Text('Inscription réussie. Veuillez vous connecter.')),
           );
-          Navigator.of(context).pop(); // Retour à l'écran de connexion
+          Navigator.of(context).pop();
         }
       }
     } else {
@@ -107,10 +101,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Form(
               key: _formKey,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Champ prénom
+                  // First name
                   TextFormField(
                     controller: _firstNameController,
                     decoration: const InputDecoration(
@@ -128,7 +120,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Champ nom
+                  // Last name
                   TextFormField(
                     controller: _lastNameController,
                     decoration: const InputDecoration(
@@ -146,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Champ nom d'utilisateur
+                  // Username
                   TextFormField(
                     controller: _usernameController,
                     decoration: const InputDecoration(
@@ -167,7 +159,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Champ email
+                  // Email
                   TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(
@@ -181,7 +173,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Veuillez entrer votre email';
                       }
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      final regex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      if (!regex.hasMatch(value)) {
                         return 'Veuillez entrer un email valide';
                       }
                       return null;
@@ -189,7 +182,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Champ mot de passe
+                  // Password
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -197,9 +190,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       labelText: 'Mot de passe',
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                        ),
+                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
                         onPressed: () {
                           setState(() {
                             _obscurePassword = !_obscurePassword;
@@ -221,7 +212,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Champ confirmation mot de passe
+                  // Confirm password
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
@@ -229,9 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       labelText: 'Confirmer le mot de passe',
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
-                        ),
+                        icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
                         onPressed: () {
                           setState(() {
                             _obscureConfirmPassword = !_obscureConfirmPassword;
@@ -252,7 +241,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Message d'erreur
                   if (_errorMessage != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -263,7 +251,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
 
-                  // Bouton d'inscription
                   SizedBox(
                     width: double.infinity,
                     height: 50,

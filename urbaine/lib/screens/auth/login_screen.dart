@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -16,19 +17,18 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  bool _obscurePassword = true;
+  bool _obscurePassword = true; // visibility of password
   String? _errorMessage;
 
   @override
-  void dispose() {
+  void dispose() { // releave memory
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    if (_formKey.currentState?.validate() != true) return;
-
+    if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -78,28 +78,27 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Logo et titre
+                // Logo
                 Icon(
                   Icons.report_problem_rounded,
                   size: 80,
                   color: Theme.of(context).primaryColor,
                 ),
                 const SizedBox(height: 24),
+
+                // Title
                 Text(
                   'Connexion',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                
-                // Formulaire
+
+                // Form
                 Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      // Champ nom d'utilisateur
                       TextFormField(
                         controller: _usernameController,
                         decoration: const InputDecoration(
@@ -107,7 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           prefixIcon: Icon(Icons.person),
                           border: OutlineInputBorder(),
                         ),
-                        keyboardType: TextInputType.text,
                         textInputAction: TextInputAction.next,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -117,8 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      
-                      // Champ mot de passe
+
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
@@ -126,9 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           labelText: 'Mot de passe',
                           prefixIcon: const Icon(Icons.lock),
                           suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                            ),
+                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
                             onPressed: () {
                               setState(() {
                                 _obscurePassword = !_obscurePassword;
@@ -145,8 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                       const SizedBox(height: 24),
-                      
-                      // Message d'erreur
+
                       if (_errorMessage != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 16),
@@ -156,8 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                      
-                      // Bouton de connexion
+
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -168,8 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               : const Text('Se connecter'),
                         ),
                       ),
-                      
-                      // Bouton d'authentification biométrique
+
                       if (authProvider.isBiometricEnabled)
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
@@ -180,14 +172,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: _isLoading ? null : _loginWithBiometrics,
                               icon: const Icon(Icons.fingerprint),
                               label: const Text('Connexion par biométrie'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal,
-                              ),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                             ),
                           ),
                         ),
-                      
-                      // Lien vers l'inscription
+
                       Padding(
                         padding: const EdgeInsets.only(top: 24),
                         child: Row(
@@ -198,9 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const RegisterScreen(),
-                                  ),
+                                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
                                 );
                               },
                               child: const Text('S\'inscrire'),

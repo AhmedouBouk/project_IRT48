@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/v1/', include('incidents.urls')),
     path('api/v1/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/v1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
     # Keep the old endpoints for backward compatibility
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair_old'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh_old'),

@@ -30,6 +30,10 @@ void main() async {
 
             // Set the auth provider inside connectivity provider
             connectivityProvider.setAuthProvider(authProvider);
+            
+            // Set the incident provider inside connectivity provider
+            // This ensures synchronization is triggered when connectivity changes
+            connectivityProvider.setIncidentProvider(incidentProvider);
           });
 
           return const UrbanIncidentApp(); // This is your main app widget (e.g., MaterialApp)

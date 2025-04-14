@@ -68,8 +68,10 @@ dependencies:
   flutter_native_splash: 
   lottie: 
   animated_splash_screen: 
+  url_launcher:
 
 dev_dependencies:
+  flutter_native_splash:
   flutter_test:
     sdk: flutter
 
@@ -87,6 +89,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/animations/
+    - assets/splash.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -123,3 +126,11 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_native_splash:
+  android: true
+  ios: false
+
+  color: "#FFFFFF"
+  image: "assets/splash.png"
+  android_gravity: center
