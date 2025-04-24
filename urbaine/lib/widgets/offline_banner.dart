@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class OfflineBanner extends StatelessWidget {
   final bool isAuthOffline;
@@ -12,24 +13,49 @@ class OfflineBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFFFF9800), // Orange color
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.secondaryColor,
+            AppTheme.secondaryColor.withOpacity(0.9),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.secondaryColor.withOpacity(0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       child: Row(
         children: [
-          Icon(
-            Icons.wifi_off,
-            color: Color(0xFFFFFFFF), // White color
-            size: 20,
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.wifi_off,
+              color: Colors.white,
+              size: 16,
+            ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               isAuthOffline
                 ? 'Mode hors ligne (authentification). Vous pouvez consulter et créer des incidents qui seront synchronisés lorsque vous serez en ligne.'
                 : 'Vous êtes hors ligne. Les incidents seront enregistrés localement et synchronisés ultérieurement.',
               style: const TextStyle(
-                color: Color(0xFFFFFFFF), // White color
-                fontSize: 12,
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
               ),
             ),
           ),

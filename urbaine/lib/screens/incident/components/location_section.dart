@@ -32,41 +32,100 @@ class LocationSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InfoCard(
-      title: 'Localisation',
-      icon: Icons.location_on,
+      title: 'Localisation de l\'incident',
+      icon: Icons.location_on_rounded,
+      iconColor: AppTheme.primaryColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(AppTheme.spacingSmall),
+            padding: const EdgeInsets.all(AppTheme.spacingMedium),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(AppTheme.borderRadiusSmall),
+              color: AppTheme.surfaceColor,
+              borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.place, size: 16, color: AppTheme.primaryColor),
-                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.place_rounded, size: 16, color: AppTheme.primaryColor),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'Latitude: ${latitude.toStringAsFixed(6)}',
-                        style: const TextStyle(fontFamily: 'monospace'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Latitude',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            latitude.toStringAsFixed(6),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const Divider(height: 24),
                 Row(
                   children: [
-                    const Icon(Icons.place, size: 16, color: AppTheme.secondaryColor),
-                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.explore_rounded, size: 16, color: AppTheme.secondaryColor),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        'Longitude: ${longitude.toStringAsFixed(6)}',
-                        style: const TextStyle(fontFamily: 'monospace'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Longitude',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            longitude.toStringAsFixed(6),
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -76,44 +135,82 @@ class LocationSection extends StatelessWidget {
           ),
           if (address != null)
             Padding(
-              padding: const EdgeInsets.only(top: AppTheme.spacingSmall),
+              padding: const EdgeInsets.only(top: AppTheme.spacingMedium),
               child: Container(
-                padding: const EdgeInsets.all(AppTheme.spacingSmall),
+                padding: const EdgeInsets.all(AppTheme.spacingMedium),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(AppTheme.borderRadiusSmall),
+                  color: AppTheme.surfaceColor.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
                   border: Border.all(color: Colors.grey.shade200),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.home, size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentTeal.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.home_rounded, size: 16, color: AppTheme.accentTeal),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        address!,
-                        style: const TextStyle(fontStyle: FontStyle.italic),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Adresse',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            address!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          const SizedBox(height: AppTheme.spacingSmall),
+          const SizedBox(height: AppTheme.spacingMedium),
           SizedBox(
             width: double.infinity,
+            height: 50,
             child: ElevatedButton.icon(
               icon: isLoading 
                   ? const SizedBox(
-                      width: 16, 
-                      height: 16, 
+                      width: 18, 
+                      height: 18, 
                       child: CircularProgressIndicator(
                         color: Colors.white,
                         strokeWidth: 2,
                       ),
                     )
-                  : const Icon(Icons.refresh),
-              label: Text(isLoading ? 'Actualisation...' : 'Actualiser la position'),
+                  : const Icon(Icons.my_location_rounded, size: 20),
+              label: Text(
+                isLoading ? 'Actualisation...' : 'Actualiser ma position',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.accentTeal,
+                foregroundColor: Colors.white,
+                elevation: 2,
+                shadowColor: AppTheme.accentTeal.withOpacity(0.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+                ),
+              ),
               onPressed: isLoading ? null : onRefreshLocation,
             ),
           ),

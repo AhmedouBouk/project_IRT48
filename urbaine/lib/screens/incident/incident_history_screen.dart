@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../widgets/incident_list_item.dart';
+import '../../theme/app_theme.dart';
 class IncidentHistoryScreen extends StatefulWidget {
   const IncidentHistoryScreen({Key? key}) : super(key: key);
 
@@ -49,12 +50,16 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                    strokeWidth: 3,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'Chargement en cours...',
-                    style: theme.textTheme.bodyLarge,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -71,14 +76,20 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
 
           return RefreshIndicator(
             onRefresh: () => incidentProvider.loadIncidents(),
+            color: AppTheme.primaryColor,
+            backgroundColor: Colors.white,
+            strokeWidth: 3,
             child: ListView.builder(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               itemCount: syncedIncidents.length,
               itemBuilder: (context, index) {
-                return IncidentListItem(
-                  incident: syncedIncidents[index],
-                  dateFormat: _dateFormat,
-                  showSyncStatus: isOffline, // Only show sync status when offline
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: IncidentListItem(
+                    incident: syncedIncidents[index],
+                    dateFormat: _dateFormat,
+                    showSyncStatus: isOffline, // Only show sync status when offline
+                  ),
                 );
               },
             ),
@@ -99,34 +110,44 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
+                color: AppTheme.primaryColor.withOpacity(0.1),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
               ),
               child: Icon(Icons.history,
-                  size: 80, color: theme.colorScheme.primary),
+                  size: 80, color: AppTheme.secondaryColor),
             ),
             const SizedBox(height: 24),
             Text('Aucun incident signalé',
                 style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold)),
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor)),
             const SizedBox(height: 12),
             Text('Utilisez le bouton "+" pour signaler un incident',
                 style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                    color: AppTheme.textSecondary),
                 textAlign: TextAlign.center),
             const SizedBox(height: 32),
             ElevatedButton.icon(
               icon: const Icon(Icons.refresh),
-              label: const Text('Actualiser'),
+              label: const Text('Actualiser', 
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
               style: ElevatedButton.styleFrom(
-                foregroundColor: theme.colorScheme.onPrimary,
-                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: Colors.white,
+                backgroundColor: AppTheme.primaryColor,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                elevation: 2,
-                shadowColor: theme.colorScheme.primary.withOpacity(0.3),
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                elevation: 3,
+                shadowColor: AppTheme.primaryColor.withOpacity(0.4),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
               onPressed: () {

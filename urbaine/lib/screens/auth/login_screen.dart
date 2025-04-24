@@ -93,7 +93,12 @@ class _LoginScreenState extends State<LoginScreen> {
         height: double.infinity,
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppTheme.primaryColor, AppTheme.secondaryColor],
+            colors: [
+              AppTheme.primaryColor,
+              AppTheme.primaryColor.withOpacity(0.8),
+              AppTheme.secondaryColor.withOpacity(0.9),
+              AppTheme.secondaryColor,
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -110,19 +115,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(AppTheme.spacingMedium),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withOpacity(0.2),
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
                     ),
                     child: Container(
                       padding: const EdgeInsets.all(AppTheme.spacingMedium),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withOpacity(0.3),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
                       child: Icon(
                         Icons.report_problem_rounded,
                         size: 60,
-                        color: AppTheme.primaryColor,
+                        color: AppTheme.secondaryColor,
                       ),
                     ),
                   ),
@@ -144,10 +163,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   
                   // Login form card
                   Card(
-                    elevation: 8,
+                    elevation: 10,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppTheme.borderRadiusExtraLarge)),
                     margin: EdgeInsets.zero,
+                    shadowColor: Colors.black.withOpacity(0.3),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppTheme.spacingMedium, 
@@ -266,12 +286,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     backgroundColor: AppTheme.accentColor,
+                                    foregroundColor: Colors.white,
+                                    elevation: 2,
+                                    shadowColor: AppTheme.accentColor.withOpacity(0.4),
                                   ),
                                   onPressed: _isLoading ? null : _loginWithBiometrics,
                                   icon: const Icon(Icons.fingerprint),
                                   label: const Text(
                                     'Connexion par biométrie',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
                                   ),
                                 ),
                               ),

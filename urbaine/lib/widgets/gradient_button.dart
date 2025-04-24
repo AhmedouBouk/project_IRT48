@@ -55,8 +55,8 @@ class GradientButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = startColor ?? Theme.of(context).colorScheme.primary;
-    final secondary = endColor ?? Theme.of(context).colorScheme.secondary;
+    final primary = startColor ?? AppTheme.primaryColor;
+    final secondary = endColor ?? AppTheme.secondaryColor;
     
     return Container(
       width: width,
@@ -67,8 +67,14 @@ class GradientButton extends StatelessWidget {
             ? [
                 BoxShadow(
                   color: primary.withOpacity(0.3),
-                  blurRadius: elevation * 2,
+                  blurRadius: elevation * 3,
                   offset: Offset(0, elevation),
+                  spreadRadius: 1,
+                ),
+                BoxShadow(
+                  color: secondary.withOpacity(0.2),
+                  blurRadius: elevation * 5,
+                  offset: Offset(0, elevation * 2),
                 ),
               ]
             : null,
@@ -90,6 +96,7 @@ class GradientButton extends StatelessWidget {
               colors: [primary, secondary],
               begin: beginGradient,
               end: endGradient,
+              stops: const [0.2, 1.0],
             ),
             borderRadius: borderRadius,
           ),
@@ -103,7 +110,10 @@ class GradientButton extends StatelessWidget {
                       strokeWidth: 2.5,
                     ),
                   )
-                : child,
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: child,
+                  ),
           ),
         ),
       ),

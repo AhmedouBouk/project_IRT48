@@ -18,6 +18,9 @@ class InfoCard extends StatelessWidget {
   /// Icon to display next to the title (optional)
   final IconData? icon;
   
+  /// Color for the icon (optional)
+  final Color? iconColor;
+  
   /// Action button to display in the title row (optional)
   final Widget? action;
   
@@ -38,6 +41,7 @@ class InfoCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(AppTheme.spacingMedium),
     this.showDivider = false,
     this.icon,
+    this.iconColor,
     this.action,
     this.backgroundColor,
     this.borderRadius,
@@ -80,7 +84,7 @@ class InfoCard extends StatelessWidget {
                   if (icon != null) ...[
                     Icon(
                       icon,
-                      color: theme.colorScheme.primary,
+                      color: iconColor ?? theme.colorScheme.primary,
                       size: 20,
                     ),
                     SizedBox(width: AppTheme.spacingSmall),

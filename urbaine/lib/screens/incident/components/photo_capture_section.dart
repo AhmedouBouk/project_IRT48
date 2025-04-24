@@ -45,8 +45,9 @@ class PhotoCaptureSection extends StatelessWidget {
     final theme = Theme.of(context);
     
     return InfoCard(
-      title: 'Photo',
-      icon: Icons.photo_camera,
+      title: 'Photo de l\'incident',
+      icon: Icons.photo_camera_rounded,
+      iconColor: AppTheme.primaryColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -68,25 +69,27 @@ class PhotoCaptureSection extends StatelessWidget {
   Widget _buildLoadingIndicator(ThemeData theme) {
     return Container(
       width: double.infinity,
-      height: 200,
+      height: 220,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(AppTheme.borderRadiusMedium),
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
         border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.3),
+          color: Colors.grey.shade200,
         ),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircularProgressIndicator(
-            color: theme.colorScheme.secondary,
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             'Traitement de l\'image...',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textSecondary,
             ),
           ),
         ],
@@ -98,12 +101,12 @@ class PhotoCaptureSection extends StatelessWidget {
   Widget _buildPhotoPreview(BuildContext context, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppTheme.borderRadiusMedium),
+        borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -119,7 +122,7 @@ class PhotoCaptureSection extends StatelessWidget {
             child: Hero(
               tag: 'photo-${photoFile?.path ?? "preview"}',
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppTheme.borderRadiusMedium),
+                borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
                 child: kIsWeb
                     ? Image.network(
                         photoFile!.path,

@@ -16,22 +16,41 @@ class TitleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InfoCard(
-      title: 'Titre',
-      icon: Icons.title,
+      title: 'Titre de l\'incident',
+      icon: Icons.title_rounded,
+      iconColor: AppTheme.primaryColor,
       child: TextFormField(
         controller: titleController,
+        style: TextStyle(fontWeight: FontWeight.w500),
         decoration: InputDecoration(
-          hintText: 'Entrez un titre bref',
+          hintText: 'Décrivez brièvement l\'incident',
+          hintStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.6)),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppTheme.borderRadiusMedium),
+            borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+            borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+            borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+            borderSide: BorderSide(color: AppTheme.primaryColor, width: 1.5),
           ),
           filled: true,
-          fillColor: Colors.white,
-          prefixIcon: const Icon(Icons.short_text),
+          fillColor: AppTheme.surfaceColor,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.spacingMedium,
+            vertical: AppTheme.spacingMedium,
+          ),
+          prefixIcon: Icon(
+            Icons.edit_note_rounded,
+            color: AppTheme.primaryColor.withOpacity(0.7),
+          ),
         ),
         validator: (value) {
           if (value == null || value.isEmpty) {
-            return 'Veuillez entrer un titre';
+            return 'Veuillez entrer un titre pour l\'incident';
           }
           return null;
         },

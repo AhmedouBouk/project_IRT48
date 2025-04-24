@@ -50,54 +50,140 @@ class AudioRecordingSection extends StatelessWidget {
     
     if (audioPath == null) {
       return Center(
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.mic),
-          label: const Text('Commencer l\'enregistrement'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.errorColor,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-          onPressed: isRecording ? null : onStartRecording,
-        ),
+        child: isRecording
+            ? _buildRecordingStatus(theme)
+            : Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Column(
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.mic_rounded, size: 24),
+                      label: const Text('Commencer l\'enregistrement'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentRed,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        elevation: 3,
+                        shadowColor: AppTheme.accentRed.withOpacity(0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onPressed: onStartRecording,
+                    ),
+                  ],
+                ),
+              ),
       );
     }
     
     // If we already have an audio path
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                icon: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
-                label: Text(isPlaying ? 'Arrêter' : 'Écouter'),
-                onPressed: isPlaying ? onStopPlaying : onPlayRecording,
-              ),
-            ),
-            const SizedBox(width: AppTheme.spacingSmall),
-            Expanded(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.delete),
-                label: const Text('Supprimer'),
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-                onPressed: onDeleteRecording,
-              ),
-            ),
-          ],
-        ),
-        if (isRecording) _buildRecordingStatus(theme),
-        if (!isRecording)
-          Padding(
-            padding: const EdgeInsets.only(top: AppTheme.spacingSmall),
-            child: Text(
-              'Enregistrement audio sauvegardé',
-              style: TextStyle(color: AppTheme.successColor, fontStyle: FontStyle.italic),
-            ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppTheme.spacingMedium),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentTeal.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.mic_none_rounded, color: AppTheme.accentTeal, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Enregistrement audio',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Enregistrement audio sauvegardé',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.successColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: Icon(isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 20),
+                  label: Text(isPlaying ? 'Arrêter' : 'Écouter'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentTeal,
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shadowColor: AppTheme.accentTeal.withOpacity(0.4),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: isPlaying ? onStopPlaying : onPlayRecording,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingMedium),
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.delete_rounded, size: 20),
+                  label: const Text('Supprimer'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppTheme.errorColor,
+                    elevation: 1,
+                    shadowColor: Colors.grey.withOpacity(0.3),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: AppTheme.errorColor.withOpacity(0.5)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.borderRadiusLarge),
+                    ),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  onPressed: onDeleteRecording,
+                ),
+              ),
+            ],
+          ),
+          if (isRecording) _buildRecordingStatus(theme),
       ],
-    );
+    ));
   }
 
   Widget _buildRecordingStatus(ThemeData theme) {

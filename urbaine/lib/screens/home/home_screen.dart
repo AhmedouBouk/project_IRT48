@@ -54,19 +54,36 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Urban Incident Reporter'),
-        elevation: 0,
+        elevation: 2,
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(15),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Se déconnecter',
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white.withOpacity(0.2),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () {
               showDialog(
                 context: context,
                 builder: (_) => AlertDialog(
                   title: const Text('Déconnexion'),
+                  titleTextStyle: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
                   content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () {
@@ -108,28 +125,39 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: (index) => setState(() {
           _currentIndex = index;
         }),
+        elevation: 8,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: theme.colorScheme.primary,
+        unselectedItemColor: Colors.grey.shade600,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.history),
+            activeIcon: Icon(Icons.history, size: 28),
             label: 'Historique',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.cloud_off),
+            activeIcon: Icon(Icons.cloud_off, size: 28),
             label: 'Hors ligne',
           ),
         ],
       ),
       floatingActionButton: GradientButton(
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add, color: Colors.white, size: 30),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateIncidentScreen()),
           );
         },
-        height: 56,
-        width: 56,
-        borderRadius: BorderRadius.circular(28),
+        height: 60,
+        width: 60,
+        borderRadius: BorderRadius.circular(30),
+        elevation: 4,
+        startColor: theme.colorScheme.secondary,
+        endColor: theme.colorScheme.secondary.withOpacity(0.8),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
