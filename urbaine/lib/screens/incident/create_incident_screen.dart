@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
@@ -11,6 +9,9 @@ import 'package:path_provider/path_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../services/location_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/gradient_button.dart';
+import 'components/components.dart';
 
 class CreateIncidentScreen extends StatefulWidget {
   const CreateIncidentScreen({Key? key}) : super(key: key);
@@ -283,18 +284,19 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Signaler un incident'),
+        elevation: 0,
       ),
       body: Stack(
         children: [
           if (isOffline)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
               color: Colors.orange,
               child: const Row(
                 children: [
                   Icon(Icons.wifi_off, color: Colors.white, size: 16),
-                  SizedBox(width: 8),
+                  SizedBox(width: AppTheme.spacingSmall),
                   Expanded(
                     child: Text(
                       'Mode hors ligne. L\'incident sera enregistré localement.',
@@ -317,10 +319,8 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
   }
 
   Widget _buildForm(BuildContext context) {
-    final theme = Theme.of(context);
-
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppTheme.spacingMedium),
       child: Form(
         key: _formKey,
         child: Column(
@@ -329,359 +329,102 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
             // Error message
             if (_errorMessage != null)
               Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: AppTheme.spacingMedium),
+                padding: const EdgeInsets.all(AppTheme.spacingSmall),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppTheme.errorColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadiusMedium),
                 ),
-                child: Text(
-                  _errorMessage!,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: Colors.red),
-                  textAlign: TextAlign.center,
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: AppTheme.errorColor),
+                    const SizedBox(width: AppTheme.spacingSmall),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: TextStyle(color: AppTheme.errorColor),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
             // Incident type
-            _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Type d\'incident',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _selectedIncidentType,
-                    decoration: const InputDecoration(border: OutlineInputBorder()),
-                    items: const [
-                      DropdownMenuItem(value: 'fire', child: Text('Incendie')),
-                      DropdownMenuItem(value: 'accident', child: Text('Accident')),
-                      DropdownMenuItem(value: 'flood', child: Text('Inondation')),
-                      DropdownMenuItem(value: 'infrastructure', child: Text('Problème d\'infrastructure')),
-                      DropdownMenuItem(value: 'other', child: Text('Autre')),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedIncidentType = value!;
-                      });
-                    },
-                  ),
-                ],
-              ),
+            IncidentTypeSection(
+              selectedIncidentType: _selectedIncidentType,
+              onIncidentTypeChanged: (value) {
+                setState(() {
+                  _selectedIncidentType = value!;
+                });
+              },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppTheme.spacingSmall),
 
             // Title
-            _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Titre',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(
-                      hintText: 'Entrez un titre bref',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Veuillez entrer un titre';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+            TitleSection(titleController: _titleController),
+            const SizedBox(height: AppTheme.spacingSmall),
 
             // Description
-            _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Description de l\'incident',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Texte'),
-                          value: 'text',
-                          groupValue: _descriptionType,
-                          onChanged: (value) {
-                            setState(() {
-                              _descriptionType = value!;
-                            });
-                          },
-                        ),
-                      ),
-                      Expanded(
-                        child: RadioListTile<String>(
-                          title: const Text('Audio'),
-                          value: 'audio',
-                          groupValue: _descriptionType,
-                          onChanged: (value) {
-                            setState(() {
-                              _descriptionType = value!;
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_descriptionType == 'text')
-                    TextFormField(
-                      controller: _descriptionController,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'Décrivez l\'incident en détail',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Veuillez fournir une description';
-                        }
-                        return null;
-                      },
-                    )
-                  else
-                    _buildAudioRecordingSection(theme),
-                ],
-              ),
+            DescriptionSection(
+              descriptionController: _descriptionController,
+              descriptionType: _descriptionType,
+              onDescriptionTypeChanged: (value) {
+                setState(() {
+                  _descriptionType = value!;
+                });
+              },
+              audioPath: _audioPath,
+              isRecording: _isRecording,
+              isPlaying: _isPlaying,
+              recordDuration: _recordDuration,
+              onStartRecording: _startRecording,
+              onStopRecording: _stopRecording,
+              onPlayRecording: _playRecording,
+              onStopPlaying: _stopPlaying,
+              onDeleteRecording: () {
+                setState(() {
+                  _audioPath = null;
+                });
+              },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppTheme.spacingSmall),
 
             // Photo
-            _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Photo',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  if (_photoFile != null)
-                    Stack(
-                      alignment: Alignment.topRight,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: kIsWeb
-                              ? Image.network(
-                                  _photoFile!.path,
-                                  width: double.infinity,
-                                  height: 200,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) {
-                                    return Container(
-                                      width: double.infinity,
-                                      height: 200,
-                                      color: Colors.grey[300],
-                                      child: const Icon(Icons.image, size: 50, color: Colors.grey),
-                                    );
-                                  },
-                                )
-                              : Image.file(
-                                  File(_photoFile!.path),
-                                  width: double.infinity,
-                                  height: 200,
-                                  fit: BoxFit.cover,
-                                ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            shadows: [Shadow(blurRadius: 3.0, color: Colors.black)],
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _photoFile = null;
-                            });
-                          },
-                        ),
-                      ],
-                    )
-                  else
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.camera_alt, size: 18),
-                            label: const Text('Photo'),
-                            onPressed: () => _getImage(ImageSource.camera),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.photo_library, size: 18),
-                            label: const Text('Galerie'),
-                            onPressed: () => _getImage(ImageSource.gallery),
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
+            PhotoCaptureSection(
+              photoFile: _photoFile,
+              onGetImage: _getImage,
+              onRemovePhoto: () {
+                setState(() {
+                  _photoFile = null;
+                });
+              },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppTheme.spacingSmall),
 
             // Location
-            _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Localisation',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Latitude: $_latitude\nLongitude: $_longitude',
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-                  if (_address != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Adresse: $_address',
-                        style: const TextStyle(fontStyle: FontStyle.italic),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Actualiser la position'),
-                    onPressed: _getCurrentLocation,
-                  ),
-                ],
-              ),
+            LocationSection(
+              latitude: _latitude,
+              longitude: _longitude,
+              address: _address,
+              onRefreshLocation: _getCurrentLocation,
+              isLoading: _isLocationLoading,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppTheme.spacingMedium),
 
             // Submit
-            SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submitForm,
-                child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Valider'),
+            GradientButton(
+              height: 56,
+              elevation: 3,
+              isLoading: _isSubmitting,
+              onPressed: _submitForm,
+              child: const Text(
+                'Valider',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildAudioRecordingSection(ThemeData theme) {
-    if (_audioPath == null) {
-      return Center(
-        child: ElevatedButton.icon(
-          icon: const Icon(Icons.mic),
-          label: const Text('Commencer l\'enregistrement'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-          onPressed: _isRecording ? null : _startRecording,
-        ),
-      );
-    }
-    // If we already have an audio path
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow),
-                label: Text(_isPlaying ? 'Arrêter' : 'Écouter'),
-                onPressed: _isPlaying ? _stopPlaying : _playRecording,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.delete),
-                label: const Text('Supprimer'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () {
-                  setState(() {
-                    _audioPath = null;
-                  });
-                },
-              ),
-            ),
-          ],
-        ),
-        if (_isRecording) _buildRecordingStatus(theme),
-        if (!_isRecording)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              'Enregistrement audio sauvegardé',
-              style: TextStyle(color: Colors.green[700], fontStyle: FontStyle.italic),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildRecordingStatus(ThemeData theme) {
-    return Column(
-      children: [
-        const SizedBox(height: 16),
-        const Text(
-          'Enregistrement en cours...',
-          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${_recordDuration.inMinutes.toString().padLeft(2, '0')}:${(_recordDuration.inSeconds % 60).toString().padLeft(2, '0')}',
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 24),
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton.icon(
-          icon: const Icon(Icons.stop),
-          label: const Text('Arrêter l\'enregistrement'),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-          onPressed: _stopRecording,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCard({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: child,
     );
   }
 }

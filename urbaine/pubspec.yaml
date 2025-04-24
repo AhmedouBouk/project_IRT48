@@ -57,7 +57,6 @@ dependencies:
   image_picker: 
   
   # Voice
-  flutter_tts:
   speech_to_text: 
   record: ^4.4.4
   audioplayers: ^5.2.1
@@ -72,6 +71,7 @@ dependencies:
 
 dev_dependencies:
   flutter_native_splash:
+  flutter_launcher_icons: ^0.13.1
   flutter_test:
     sdk: flutter
 

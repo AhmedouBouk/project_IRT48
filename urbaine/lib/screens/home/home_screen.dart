@@ -5,9 +5,11 @@ import '../../providers/auth_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../widgets/offline_banner.dart';
+import '../../widgets/gradient_button.dart';
 import '../incident/create_incident_screen.dart';
 import '../incident/incident_history_screen.dart';
 import 'offline_incidents_screen.dart';
+import '../auth/login_screen.dart'; // Assure-toi que c’est le bon chemin pour LoginScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -45,32 +47,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final connectivityProvider = Provider.of<ConnectivityProvider>(context);
-    final incidentProvider = Provider.of<IncidentProvider>(context);
+    final theme = Theme.of(context);
 
     final bool isOffline = !connectivityProvider.isOnline || authProvider.isOfflineMode;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Urban Incident Reporter'),
+        elevation: 0,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         actions: [
-          // Sync button if offline
-          if (isOffline)
-            IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: 'Synchroniser les données',
-              onPressed: incidentProvider.isSyncing
-                  ? null
-                  : () {
-                      incidentProvider.syncIncidents();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Synchronisation en cours...'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-            ),
-          // Logout button
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Se déconnecter',
@@ -82,13 +69,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   content: const Text('Voulez-vous vraiment vous déconnecter ?'),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
                       child: const Text('Annuler'),
                     ),
                     TextButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context);
-                        authProvider.logout();
+                        await authProvider.logout();
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          (route) => false,
+                        );
                       },
                       child: const Text('Déconnecter'),
                     ),
@@ -126,17 +119,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'homeScreenFAB',
+      floatingActionButton: GradientButton(
+        child: const Icon(Icons.add, color: Colors.white),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const CreateIncidentScreen()),
           );
         },
-        child: const Icon(Icons.add),
-        tooltip: 'Signaler un incident',
+        height: 56,
+        width: 56,
+        borderRadius: BorderRadius.circular(28),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 }
