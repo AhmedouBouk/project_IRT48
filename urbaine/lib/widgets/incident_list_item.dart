@@ -394,6 +394,46 @@ class _IncidentListItemState extends State<IncidentListItem> {
     );
   }
 
+  Future<void> _openInMaps(double lat, double lng) async {
+    // Vérifier que les coordonnées sont valides
+    if (lat == 0.0 && lng == 0.0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Coordonnées GPS non disponibles')),
+      );
+      return;
+    }
+    
+    // Utiliser une URL compatible avec plus d'applications
+    final url = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+    final uri = Uri.parse(url);
+    
+    try {
+      if (await canLaunchUrl(uri)) {
+        final success = await launchUrl(
+          uri, 
+          mode: LaunchMode.externalApplication,
+        );
+        
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Échec de l\'ouverture de Google Maps')),
+          );
+        }
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: $e')),
+      );
+    }
+  }
+
   Future<void> _showFullImageDialog(String photoUrl) async {
     await showDialog(
       context: context,
@@ -510,6 +550,14 @@ class _IncidentListItemState extends State<IncidentListItem> {
               if (_expanded) ...[
                 _buildExpandedDescription(),
                 _buildAudioPlayer(),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.location_on),
+                  label: const Text('Voir sur la carte'),
+                  onPressed: () => _openInMaps(incident.latitude, incident.longitude),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
                 if (widget.customActions != null) ...[
                   const Divider(),
                   Row(
