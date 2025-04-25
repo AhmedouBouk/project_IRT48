@@ -1,4 +1,3 @@
-// lib/widgets/incident_list_item.dart
 import 'dart:async';
 import 'dart:io';
 
@@ -75,7 +74,11 @@ class _IncidentListItemState extends State<IncidentListItem> {
   void _showErrorSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -102,112 +105,114 @@ class _IncidentListItemState extends State<IncidentListItem> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Chargement de l\'audio...')),
+      const SnackBar(
+        content: Text('Chargement de l\'audio...'),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
 
     try {
-      // 1. Essayer de lire depuis une URL HTTP
-      if (path.startsWith('http')) {
-        debugPrint('🎵 Lecture depuis URL: $path');
-        try {
-          await _audioPlayer.play(UrlSource(path));
-          setState(() => _isPlaying = true);
-          return;
-        } catch (e) {
-          debugPrint('🎵 Erreur lors de la lecture depuis URL: $e');
-          // Si l'URL échoue, continuer avec les autres méthodes
-        }
-      }
-      
-      // 2. Essayer le chemin original
-      final file = File(path);
-      if (await file.exists()) {
-        debugPrint('🎵 Fichier trouvé au chemin original: $path');
-        await _audioPlayer.play(DeviceFileSource(path));
-        setState(() => _isPlaying = true);
-        return;
-      }
-      
-      debugPrint('🎵 Fichier introuvable au chemin original: $path');
-      
-      // 3. Extraire le nom du fichier pour recherche
-      final fileName = path.split('/').last;
-      
-      // 4. Essayer dans le répertoire des documents
-      final docsDir = await getApplicationDocumentsDirectory();
-      final docsPath = '${docsDir.path}/$fileName';
-      final docsFile = File(docsPath);
-      
-      if (await docsFile.exists()) {
-        debugPrint('🎵 Fichier trouvé dans les documents: $docsPath');
-        await _audioPlayer.play(DeviceFileSource(docsPath));
-        setState(() => _isPlaying = true);
-        return;
-      }
-      
-      // 5. Essayer dans le répertoire temporaire
-      final tempDir = await getTemporaryDirectory();
-      final tempPath = '${tempDir.path}/$fileName';
-      final tempFile = File(tempPath);
-      
-      if (await tempFile.exists()) {
-        debugPrint('🎵 Fichier trouvé dans le répertoire temporaire: $tempPath');
-        
-        // Copier vers le répertoire des documents pour une utilisation future
-        try {
-          await tempFile.copy(docsPath);
-          debugPrint('🎵 Fichier copié vers les documents: $docsPath');
-        } catch (e) {
-          debugPrint('🎵 Erreur lors de la copie du fichier: $e');
-        }
-        
-        await _audioPlayer.play(DeviceFileSource(tempPath));
-        setState(() => _isPlaying = true);
-        return;
-      }
-      
-      // 6. Recherche avancée - parcourir tous les fichiers audio dans les documents
-      try {
-        final docFiles = docsDir.listSync();
-        final audioFiles = docFiles.where((file) => 
-            file.path.endsWith('.m4a') || 
-            file.path.endsWith('.mp3') || 
-            file.path.endsWith('.aac')
-        ).toList();
-        
-        if (audioFiles.isNotEmpty) {
-          // Chercher un fichier qui contient une partie du nom du fichier original
-          final baseFileName = fileName.split('.').first;
-          for (var file in audioFiles) {
-            final currentFileName = file.path.split('/').last;
-            if (currentFileName.contains(baseFileName) || 
-                baseFileName.contains(currentFileName.split('.').first)) {
-              debugPrint('🎵 Fichier audio similaire trouvé: ${file.path}');
-              await _audioPlayer.play(DeviceFileSource(file.path));
-              setState(() => _isPlaying = true);
-              return;
-            }
-          }
-          
-          // Si aucun fichier correspondant n'est trouvé, utiliser le plus récent
-          audioFiles.sort((a, b) => 
-            File(b.path).statSync().modified.compareTo(File(a.path).statSync().modified)
-          );
-          
-          debugPrint('🎵 Utilisation du fichier audio le plus récent: ${audioFiles.first.path}');
-          await _audioPlayer.play(DeviceFileSource(audioFiles.first.path));
-          setState(() => _isPlaying = true);
-          return;
-        }
-      } catch (e) {
-        debugPrint('🎵 Erreur lors de la recherche avancée: $e');
-      }
-      
-      // 7. Si on arrive ici, aucun fichier audio n'a été trouvé
-      _showErrorSnackBar('Fichier audio non trouvé');
+      // Stratégie de lecture audio en cascade
+      await _tryPlayAudioFromMultipleSources(path);
     } catch (e) {
       debugPrint('🎵 ERREUR lecture audio: $e');
       _showErrorSnackBar('Erreur de lecture audio');
+    }
+  }
+
+  Future<void> _tryPlayAudioFromMultipleSources(String path) async {
+    // 1. Essayer de lire depuis une URL HTTP
+    if (path.startsWith('http')) {
+      try {
+        await _audioPlayer.play(UrlSource(path));
+        setState(() => _isPlaying = true);
+        return;
+      } catch (e) {
+        debugPrint('🎵 Erreur lors de la lecture depuis URL: $e');
+      }
+    }
+    
+    // 2. Essayer le chemin original
+    final file = File(path);
+    if (await file.exists()) {
+      await _audioPlayer.play(DeviceFileSource(path));
+      setState(() => _isPlaying = true);
+      return;
+    }
+    
+    // 3. Extraire le nom du fichier pour recherche
+    final fileName = path.split('/').last;
+    
+    // 4. Essayer dans le répertoire des documents
+    final docsDir = await getApplicationDocumentsDirectory();
+    final docsPath = '${docsDir.path}/$fileName';
+    final docsFile = File(docsPath);
+    
+    if (await docsFile.exists()) {
+      await _audioPlayer.play(DeviceFileSource(docsPath));
+      setState(() => _isPlaying = true);
+      return;
+    }
+    
+    // 5. Essayer dans le répertoire temporaire
+    final tempDir = await getTemporaryDirectory();
+    final tempPath = '${tempDir.path}/$fileName';
+    final tempFile = File(tempPath);
+    
+    if (await tempFile.exists()) {
+      // Copier vers le répertoire des documents pour une utilisation future
+      try {
+        await tempFile.copy(docsPath);
+      } catch (e) {
+        debugPrint('🎵 Erreur lors de la copie du fichier: $e');
+      }
+      
+      await _audioPlayer.play(DeviceFileSource(tempPath));
+      setState(() => _isPlaying = true);
+      return;
+    }
+    
+    // 6. Recherche avancée - parcourir tous les fichiers audio dans les documents
+    await _tryFindSimilarAudioFile(fileName, docsDir);
+  }
+
+  Future<void> _tryFindSimilarAudioFile(String fileName, Directory docsDir) async {
+    try {
+      final docFiles = docsDir.listSync();
+      final audioFiles = docFiles.where((file) => 
+          file.path.endsWith('.m4a') || 
+          file.path.endsWith('.mp3') || 
+          file.path.endsWith('.aac')
+      ).toList();
+      
+      if (audioFiles.isNotEmpty) {
+        // Chercher un fichier qui contient une partie du nom du fichier original
+        final baseFileName = fileName.split('.').first;
+        for (var file in audioFiles) {
+          final currentFileName = file.path.split('/').last;
+          if (currentFileName.contains(baseFileName) || 
+              baseFileName.contains(currentFileName.split('.').first)) {
+            await _audioPlayer.play(DeviceFileSource(file.path));
+            setState(() => _isPlaying = true);
+            return;
+          }
+        }
+        
+        // Si aucun fichier correspondant n'est trouvé, utiliser le plus récent
+        audioFiles.sort((a, b) => 
+          File(b.path).statSync().modified.compareTo(File(a.path).statSync().modified)
+        );
+        
+        await _audioPlayer.play(DeviceFileSource(audioFiles.first.path));
+        setState(() => _isPlaying = true);
+        return;
+      }
+      
+      // Si on arrive ici, aucun fichier audio n'a été trouvé
+      _showErrorSnackBar('Fichier audio non trouvé');
+    } catch (e) {
+      debugPrint('🎵 Erreur lors de la recherche avancée: $e');
+      _showErrorSnackBar('Erreur lors de la recherche du fichier audio');
     }
   }
 
@@ -222,12 +227,18 @@ class _IncidentListItemState extends State<IncidentListItem> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(),
+        const Divider(height: 24),
         Row(
           children: [
             IconButton(
-              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+              icon: Icon(
+                _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                color: Theme.of(context).primaryColor,
+                size: 32,
+              ),
               onPressed: () => _playAudio(audioFile),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             ),
             Expanded(
               child: Slider(
@@ -237,11 +248,11 @@ class _IncidentListItemState extends State<IncidentListItem> {
                   final position = Duration(seconds: value.toInt());
                   _audioPlayer.seek(position);
                 },
+                activeColor: Theme.of(context).primaryColor,
               ),
             ),
             Text(
-              '${_position.inMinutes}:${(_position.inSeconds % 60).toString().padLeft(2, '0')} / '
-              '${_duration.inMinutes}:${(_duration.inSeconds % 60).toString().padLeft(2, '0')}',
+              '${_position.inMinutes}:${(_position.inSeconds % 60).toString().padLeft(2, '0')}',
               style: const TextStyle(fontSize: 12),
             ),
           ],
@@ -251,11 +262,19 @@ class _IncidentListItemState extends State<IncidentListItem> {
   }
 
   Widget _buildTypeIcon(String type) {
+    final color = _getTypeColor(type);
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: _getTypeColor(type),
+        color: color.withOpacity(0.9),
         shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Icon(
         _getTypeIcon(type),
@@ -272,11 +291,11 @@ class _IncidentListItemState extends State<IncidentListItem> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: synced ? Colors.green : Colors.orange,
+        color: synced ? Colors.green.shade600 : Colors.orange.shade600,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        synced ? 'Synchronisé' : 'Non synchronisé',
+        synced ? 'Sync' : 'Non sync',
         style: const TextStyle(
           color: Colors.white,
           fontSize: 10,
@@ -295,11 +314,25 @@ class _IncidentListItemState extends State<IncidentListItem> {
     
     return GestureDetector(
       onTap: () => _showFullImageDialog(photoUrl),
-      child: Container(
-        width: 60,
-        height: 60,
-        margin: const EdgeInsets.only(right: 8),
-        child: _buildImageContainer(photoUrl),
+      child: Hero(
+        tag: 'incident-photo-${widget.incident.id}',
+        child: Container(
+          width: 60,
+          height: 60,
+          margin: const EdgeInsets.only(right: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: _buildImageContainer(photoUrl),
+        ),
       ),
     );
   }
@@ -314,7 +347,7 @@ class _IncidentListItemState extends State<IncidentListItem> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Divider(),
+        const Divider(height: 24),
         const Text(
           'Description',
           style: TextStyle(
@@ -322,8 +355,21 @@ class _IncidentListItemState extends State<IncidentListItem> {
             fontSize: 14,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(description),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            description,
+            style: TextStyle(
+              color: Colors.grey.shade800,
+              height: 1.4,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -331,32 +377,32 @@ class _IncidentListItemState extends State<IncidentListItem> {
   Color _getTypeColor(String type) {
     switch (type.toLowerCase()) {
       case 'accident':
-        return Colors.red;
+        return Colors.red.shade700;
       case 'travaux':
-        return Colors.orange;
+        return Colors.orange.shade700;
       case 'événement':
       case 'evenement':
-        return Colors.blue;
+        return Colors.blue.shade700;
       case 'autre':
-        return Colors.purple;
+        return Colors.purple.shade700;
       default:
-        return Colors.grey;
+        return Colors.grey.shade700;
     }
   }
 
   IconData _getTypeIcon(String type) {
     switch (type.toLowerCase()) {
       case 'accident':
-        return Icons.warning;
+        return Icons.warning_amber_rounded;
       case 'travaux':
         return Icons.construction;
       case 'événement':
       case 'evenement':
-        return Icons.event;
+        return Icons.event_available;
       case 'autre':
-        return Icons.info;
+        return Icons.info_outline;
       default:
-        return Icons.help;
+        return Icons.help_outline;
     }
   }
 
@@ -368,6 +414,18 @@ class _IncidentListItemState extends State<IncidentListItem> {
         errorBuilder: (context, error, stackTrace) {
           debugPrint('Erreur de chargement d\'image: $error');
           return _buildBrokenImage();
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded / 
+                    loadingProgress.expectedTotalBytes!
+                  : null,
+              strokeWidth: 2,
+            ),
+          );
         },
       );
     } else {
@@ -384,10 +442,10 @@ class _IncidentListItemState extends State<IncidentListItem> {
 
   Widget _buildBrokenImage() {
     return Container(
-      color: Colors.grey[300],
+      color: Colors.grey[200],
       child: const Center(
         child: Icon(
-          Icons.broken_image,
+          Icons.broken_image_rounded,
           color: Colors.grey,
         ),
       ),
@@ -398,9 +456,7 @@ class _IncidentListItemState extends State<IncidentListItem> {
     // Vérifier que les coordonnées sont valides
     if (lat == 0.0 && lng == 0.0) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Coordonnées GPS non disponibles')),
-      );
+      _showErrorSnackBar('Coordonnées GPS non disponibles');
       return;
     }
     
@@ -416,21 +472,15 @@ class _IncidentListItemState extends State<IncidentListItem> {
         );
         
         if (!success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Échec de l\'ouverture de Google Maps')),
-          );
+          _showErrorSnackBar('Échec de l\'ouverture de Google Maps');
         }
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible d\'ouvrir Google Maps')),
-        );
+        _showErrorSnackBar('Impossible d\'ouvrir Google Maps');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e')),
-      );
+      _showErrorSnackBar('Erreur: $e');
     }
   }
 
@@ -438,12 +488,19 @@ class _IncidentListItemState extends State<IncidentListItem> {
     await showDialog(
       context: context,
       builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             AppBar(
               title: const Text('Photo de l\'incident'),
+              centerTitle: true,
               automaticallyImplyLeading: false,
+              elevation: 0,
               actions: [
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -451,24 +508,101 @@ class _IncidentListItemState extends State<IncidentListItem> {
                 ),
               ],
             ),
-            InteractiveViewer(
-              minScale: 0.5,
-              maxScale: 3.0,
-              child: photoUrl.startsWith('http')
-                  ? Image.network(
-                      photoUrl,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildBrokenImage();
-                      },
-                    )
-                  : Image.file(
-                      File(photoUrl),
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildBrokenImage();
-                      },
-                    ),
+            Flexible(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 3.0,
+                child: Hero(
+                  tag: 'incident-photo-${widget.incident.id}',
+                  child: photoUrl.startsWith('http')
+                      ? Image.network(
+                          photoUrl,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildBrokenImage();
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded / 
+                                      loadingProgress.expectedTotalBytes!
+                                    : null,
+                              ),
+                            );
+                          },
+                        )
+                      : Image.file(
+                          File(photoUrl),
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildBrokenImage();
+                          },
+                        ),
+                ),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationButton() {
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.location_on, size: 16),
+      label: const Text('Voir sur la carte'),
+      onPressed: () => _openInMaps(widget.incident.latitude, widget.incident.longitude),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  Widget _buildIncidentMeta() {
+    return Row(
+      children: [
+        Icon(
+          Icons.access_time,
+          size: 12,
+          color: Colors.grey[600],
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            widget.incident.createdAt != null 
+                ? widget.dateFormat.format(widget.incident.createdAt!)
+                : "date inconnue",
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTypeChip() {
+    final type = widget.incident.incidentType;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _getTypeColor(type).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: _getTypeColor(type).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        type,
+        style: TextStyle(
+          color: _getTypeColor(type),
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
@@ -477,22 +611,26 @@ class _IncidentListItemState extends State<IncidentListItem> {
   @override
   Widget build(BuildContext context) {
     final incident = widget.incident;
-    final dateFormat = widget.dateFormat;
     
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: InkWell(
         onTap: () {
           setState(() {
             _expanded = !_expanded;
           });
         },
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header section with title and sync badge
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -502,8 +640,8 @@ class _IncidentListItemState extends State<IncidentListItem> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Title and sync badge
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
                               child: Text(
@@ -516,30 +654,20 @@ class _IncidentListItemState extends State<IncidentListItem> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            _buildSyncBadge(),
+                            if (widget.showSyncStatus) ...[
+                              const SizedBox(width: 4),
+                              _buildSyncBadge(),
+                            ],
                           ],
                         ),
+                        
+                        // Date and type
                         const SizedBox(height: 4),
-                        Text(
-                          'Signalé le ${incident.createdAt != null ? dateFormat.format(incident.createdAt!) : "date inconnue"}',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
                         Row(
                           children: [
-                            _buildThumbnail(),
-                            Expanded(
-                              child: Text(
-                                incident.description ?? '',
-                                maxLines: _expanded ? null : 2,
-                                overflow: _expanded
-                                    ? TextOverflow.visible
-                                    : TextOverflow.ellipsis,
-                              ),
-                            ),
+                            Expanded(child: _buildIncidentMeta()),
+                            const SizedBox(width: 4),
+                            _buildTypeChip(),
                           ],
                         ),
                       ],
@@ -547,22 +675,87 @@ class _IncidentListItemState extends State<IncidentListItem> {
                   ),
                 ],
               ),
-              if (_expanded) ...[
-                _buildExpandedDescription(),
-                _buildAudioPlayer(),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.location_on),
-                  label: const Text('Voir sur la carte'),
-                  onPressed: () => _openInMaps(incident.latitude, incident.longitude),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+              
+              // Content section
+              const SizedBox(height: 8),
+              if (incident.description != null && incident.description!.isNotEmpty) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (incident.photoUrl != null && incident.photoUrl!.isNotEmpty)
+                      _buildThumbnail(),
+                    Expanded(
+                      child: Text(
+                        incident.description!,
+                        maxLines: _expanded ? null : 2,
+                        overflow: _expanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.grey[800],
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              
+              // Expand indicator
+              if (!_expanded && (incident.description?.length ?? 0) > 100)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _expanded = true;
+                      });
+                    },
+                    child: const Text('Voir plus'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                   ),
                 ),
-                if (widget.customActions != null) ...[
-                  const Divider(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: widget.customActions!,
+              
+              // Expanded content
+              if (_expanded) ...[
+                if (incident.photoUrl != null && incident.photoUrl!.isNotEmpty && incident.description == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: _buildThumbnail(),
+                  ),
+                _buildAudioPlayer(),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildLocationButton(),
+                    IconButton(
+                      icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _expanded = false;
+                        });
+                      },
+                      tooltip: 'Réduire',
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
+                ),
+                if (widget.customActions != null && widget.customActions!.isNotEmpty) ...[
+                  const Divider(height: 24),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: widget.customActions!,
+                    ),
                   ),
                 ],
               ],
