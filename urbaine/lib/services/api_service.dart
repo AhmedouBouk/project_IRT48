@@ -483,7 +483,10 @@ class ApiService {
       fields['local_id'] = incident.localId!;
     }
 
-    http.MultipartFile? photoMultipart;
+    // Liste des fichiers multipart à envoyer
+    List<http.MultipartFile> multipartFiles = [];
+
+    // Traitement de la photo
     if (photo != null && photo.path.isNotEmpty) {
       try {
         if (await File(photo.path).exists()) {
@@ -519,11 +522,12 @@ class ApiService {
             );
           }
           
-          photoMultipart = await http.MultipartFile.fromPath(
+          final photoMultipart = await http.MultipartFile.fromPath(
             'photo',
             photoPath,
             filename: path.basename(photoPath),
           );
+          multipartFiles.add(photoMultipart);
           print('Photo file prepared for upload: $photoPath');
         } else {
           print('Photo file does not exist: ${photo.path}');
@@ -533,11 +537,31 @@ class ApiService {
       }
     }
 
+    // Traitement du fichier audio
+    if (incident.audioFile != null && incident.audioFile!.isNotEmpty) {
+      try {
+        final audioFile = File(incident.audioFile!);
+        if (await audioFile.exists()) {
+          final audioMultipart = await http.MultipartFile.fromPath(
+            'audio_file',
+            incident.audioFile!,
+            filename: path.basename(incident.audioFile!),
+          );
+          multipartFiles.add(audioMultipart);
+          print('Audio file prepared for upload: ${incident.audioFile}');
+        } else {
+          print('Audio file does not exist: ${incident.audioFile}');
+        }
+      } catch (e) {
+        print('Error processing audio file: $e');
+      }
+    }
+
     final resp = await _makeAuthorizedRequest(
       method: 'POST',
       endpoint: 'incidents/',
       fields: fields,
-      files: (photoMultipart != null) ? [photoMultipart] : null,
+      files: multipartFiles.isNotEmpty ? multipartFiles : null,
     );
     if (resp.statusCode == 201) {
       return Incident.fromJson(jsonDecode(resp.body));

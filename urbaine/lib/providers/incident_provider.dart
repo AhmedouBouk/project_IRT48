@@ -281,7 +281,30 @@ class IncidentProvider with ChangeNotifier {
         // Continue without the photo if there's an error
       }
     }
-
+  
+    // Si un fichier audio est fourni, le copier dans un stockage permanent
+    String? permanentAudioPath = audioFile;
+    if (audioFile != null && audioFile.isNotEmpty) {
+      try {
+        final audioDirectory = await getApplicationDocumentsDirectory();
+        final fileName = '${localId}_${path.basename(audioFile)}';
+        final permanentPath = path.join(audioDirectory.path, fileName);
+        
+        final audioFileObj = File(audioFile);
+        if (await audioFileObj.exists()) {
+          await audioFileObj.copy(permanentPath);
+          permanentAudioPath = permanentPath;
+          print('Audio file copied to permanent storage: $permanentPath');
+        } else {
+          print('Audio file does not exist: $audioFile');
+          permanentAudioPath = null;
+        }
+      } catch (e) {
+        print('Error copying audio file to permanent storage: $e');
+        // Continue without the audio if there's an error
+      }
+    }
+    
     // Compress the photo if available and we're not on WiFi
     String? compressedPhotoPath = photoPath;
     if (photoPath != null && photoPath.isNotEmpty) {
@@ -308,7 +331,7 @@ class IncidentProvider with ChangeNotifier {
       title: title,
       description: description,
       photo: compressedPhotoPath,
-      audioFile: audioFile,
+      audioFile: permanentAudioPath,
       latitude: latitude,
       longitude: longitude,
       address: address,

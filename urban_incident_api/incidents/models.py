@@ -60,6 +60,7 @@ class Incident(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
     photo = models.ImageField(upload_to='incidents/')
+    audio_file = models.FileField(upload_to='incidents/audio/', blank=True, null=True)  # Nouveau champ pour les fichiers audio
     latitude = models.FloatField()
     longitude = models.FloatField()
     address = models.CharField(max_length=255, blank=True, null=True)

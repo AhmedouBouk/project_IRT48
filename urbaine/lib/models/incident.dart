@@ -65,6 +65,24 @@ class Incident {
   });
 
   factory Incident.fromJson(Map<String, dynamic> json) {
+    // Débogage des données reçues du serveur
+    print('\n🔍 INCIDENT FROM JSON: ${json.toString()}');
+    
+    // Vérifier les différentes clés possibles pour le fichier audio
+    String? audioFilePath;
+    if (json['audio_file'] != null && json['audio_file'].toString().isNotEmpty) {
+      audioFilePath = json['audio_file'];
+    } else if (json['audio'] != null && json['audio'].toString().isNotEmpty) {
+      audioFilePath = json['audio'];
+    } else if (json['voice_recording'] != null && json['voice_recording'].toString().isNotEmpty) {
+      audioFilePath = json['voice_recording'];
+    }
+    
+    // Si isVoiceDescription est true mais qu'on n'a pas de fichier audio, on garde le chemin local
+    final bool hasVoiceDescription = json['is_voice_description'] == true || 
+                                    json['is_voice_description'] == 'true' || 
+                                    json['is_voice_description'] == 1;
+    
     return Incident(
       id: json['id'],
       localId: json['local_id'],
@@ -72,9 +90,9 @@ class Incident {
       title: json['title'],
       description: json['description'],
       photo: json['photo'],
-      audioFile: json['audio_file'],
-      latitude: json['latitude'],
-      longitude: json['longitude'],
+      audioFile: audioFilePath,
+      latitude: json['latitude'] is String ? double.tryParse(json['latitude']) ?? 0.0 : json['latitude'] ?? 0.0,
+      longitude: json['longitude'] is String ? double.tryParse(json['longitude']) ?? 0.0 : json['longitude'] ?? 0.0,
       address: json['address'],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
@@ -83,13 +101,31 @@ class Incident {
           ? DateTime.parse(json['updated_at'])
           : null,
       status: json['status'] ?? 'new',
-      isVoiceDescription: json['is_voice_description'] ?? false,
+      isVoiceDescription: hasVoiceDescription,
       userUsername: json['user_username'],
       isSynced: true,
     );
   }
 
   factory Incident.fromMap(Map<String, dynamic> map) {
+    // Débogage des données reçues de la base de données locale
+    print('\n🔍 INCIDENT FROM MAP: ${map.toString()}');
+    
+    // Vérifier les différentes clés possibles pour le fichier audio
+    String? audioFilePath;
+    if (map['audio_file'] != null && map['audio_file'].toString().isNotEmpty) {
+      audioFilePath = map['audio_file'];
+    } else if (map['audio'] != null && map['audio'].toString().isNotEmpty) {
+      audioFilePath = map['audio'];
+    } else if (map['voice_recording'] != null && map['voice_recording'].toString().isNotEmpty) {
+      audioFilePath = map['voice_recording'];
+    }
+    
+    // Vérifier si l'incident a une description vocale
+    final bool hasVoiceDescription = map['is_voice_description'] == 1 || 
+                                    map['is_voice_description'] == true || 
+                                    map['is_voice_description'] == 'true';
+    
     return Incident(
       id: map['id'],
       localId: map['local_id'],
@@ -97,9 +133,9 @@ class Incident {
       title: map['title'],
       description: map['description'],
       photo: map['photo'],
-      audioFile: map['audio_file'],
-      latitude: map['latitude'],
-      longitude: map['longitude'],
+      audioFile: audioFilePath,
+      latitude: map['latitude'] is String ? double.tryParse(map['latitude']) ?? 0.0 : map['latitude'] ?? 0.0,
+      longitude: map['longitude'] is String ? double.tryParse(map['longitude']) ?? 0.0 : map['longitude'] ?? 0.0,
       address: map['address'],
       createdAt: map['created_at'] != null
           ? DateTime.parse(map['created_at'])
@@ -108,7 +144,7 @@ class Incident {
           ? DateTime.parse(map['updated_at'])
           : null,
       status: map['status'] ?? 'new',
-      isVoiceDescription: map['is_voice_description'] == 1,
+      isVoiceDescription: hasVoiceDescription,
       userUsername: map['user_username'],
       isSynced: map['is_synced'] == 1,
     );

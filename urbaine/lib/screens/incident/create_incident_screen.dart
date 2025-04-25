@@ -69,9 +69,12 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
   Future<void> _startRecording() async {
     try {
       if (await _audioRecorder.hasPermission()) {
-        final directory = await getTemporaryDirectory();
-        final path = '${directory.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
+        // Utiliser le répertoire de documents au lieu du répertoire temporaire
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName = 'audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        final path = '${directory.path}/$fileName';
+        
+        debugPrint('🎙️ Début d\'enregistrement audio dans: $path');
         await _audioRecorder.start(path: path);
 
         _recordDuration = Duration.zero;
@@ -91,6 +94,7 @@ class _CreateIncidentScreenState extends State<CreateIncidentScreen> {
         );
       }
     } catch (e) {
+      debugPrint('🎙️ Erreur d\'enregistrement: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur lors de l\'enregistrement: $e')),
       );
