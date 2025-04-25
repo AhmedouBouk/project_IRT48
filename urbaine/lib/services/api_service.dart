@@ -9,13 +9,23 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/incident.dart';
 import '../models/user.dart';
+import 'compression_service.dart';
+import 'network_info_service.dart';
+import 'conflict_resolution_service.dart';
 
 class ApiService {
   static const int timeoutDuration = 20; // seconds - increased for better reliability
   static const int retryCount = 2; // Number of retries for network requests
+  static const String _lastSyncKey = 'last_sync_timestamp';
+  static const String _syncStatusKey = 'sync_status';
+  
+  // Network and conflict resolution services
+  final NetworkInfoService _networkInfo = NetworkInfoService();
+  final ConflictResolutionService _conflictService = ConflictResolutionService();
   
   static String get baseUrl {
     
@@ -477,17 +487,49 @@ class ApiService {
     if (photo != null && photo.path.isNotEmpty) {
       try {
         if (await File(photo.path).exists()) {
+          // Compress the image based on network conditions
+          String photoPath = photo.path;
+          
+          // Only compress if it's not a web URL
+          if (!photoPath.startsWith('http')) {
+            // Check network type and apply appropriate compression
+            await _networkInfo.refreshNetworkInfo();
+            final networkType = _networkInfo.networkType;
+            final connectionQuality = _networkInfo.connectionQuality;
+            
+            print('Network type: $networkType, Quality: $connectionQuality');
+            
+            // Determine compression quality based on connection
+            int compressionQuality;
+            if (_networkInfo.isLowBandwidth) {
+              compressionQuality = CompressionService.lowQuality;
+              print('Using low quality compression for slow connection');
+            } else if (networkType == NetworkType.mobile) {
+              compressionQuality = CompressionService.mediumQuality;
+              print('Using medium quality compression for mobile data');
+            } else {
+              compressionQuality = CompressionService.highQuality;
+              print('Using high quality compression for WiFi');
+            }
+            
+            // Compress the image
+            photoPath = await CompressionService.compressImage(
+              photo.path, 
+              quality: compressionQuality
+            );
+          }
+          
           photoMultipart = await http.MultipartFile.fromPath(
             'photo',
-            photo.path,
-            filename: path.basename(photo.path),
+            photoPath,
+            filename: path.basename(photoPath),
           );
-          print('Photo file prepared for upload: ${photo.path}');
+          print('Photo file prepared for upload: $photoPath');
         } else {
           print('Photo file does not exist: ${photo.path}');
         }
       } catch (e) {
-        print('Error reading photo file: $e');
+        print('Error processing photo file: $e');
       }
     }
 
@@ -509,21 +551,26 @@ class ApiService {
     try {
       if (localIncidents.isEmpty) {
         print('No incidents to sync');
+        await _saveSyncStatus('success', 'No incidents to sync');
         return [];
       }
       
       print('Starting sync of ${localIncidents.length} incidents');
+      await _saveSyncStatus('syncing', 'Starting sync process');
       
-      // Check connectivity before attempting sync
+      // Check connectivity and network type before attempting sync
+      await _networkInfo.refreshNetworkInfo();
       final isConnected = await checkServerConnectivity();
       if (!isConnected) {
         print('Cannot sync incidents: device is offline');
+        await _saveSyncStatus('offline', 'Device is offline');
         throw Exception('Cannot sync incidents: device is offline');
       }
       
       // For incidents with photos, we need to handle them one by one
       List<Incident> syncedIncidents = [];
       List<Incident> failedIncidents = [];
+      List<Incident> conflictedIncidents = [];
       
       // Group incidents by those with and without photos for more efficient processing
       final incidentsWithPhotos = localIncidents.where((i) => 
@@ -534,19 +581,40 @@ class ApiService {
       print('Incidents with photos: ${incidentsWithPhotos.length}');
       print('Incidents without photos: ${incidentsWithoutPhotos.length}');
       
+      // Get optimal batch size based on network conditions
+      int batchSize = _networkInfo.isLowBandwidth ? 3 : 5;
+      print('Using batch size of $batchSize based on network conditions');
+      
       // First sync incidents without photos (faster and can be done in bulk)
       if (incidentsWithoutPhotos.isNotEmpty) {
         try {
           print('Syncing ${incidentsWithoutPhotos.length} incidents without photos');
+          await _saveSyncStatus('syncing', 'Syncing incidents without photos');
+          
           // Process in smaller batches to avoid timeouts
-          for (int i = 0; i < incidentsWithoutPhotos.length; i += 5) {
-            final endIndex = (i + 5 < incidentsWithoutPhotos.length) 
-                ? i + 5 
+          for (int i = 0; i < incidentsWithoutPhotos.length; i += batchSize) {
+            final endIndex = (i + batchSize < incidentsWithoutPhotos.length) 
+                ? i + batchSize 
                 : incidentsWithoutPhotos.length;
             final batch = incidentsWithoutPhotos.sublist(i, endIndex);
             
             try {
-              final body = jsonEncode(batch.map((i) => i.toJson()).toList());
+              // Check for conflicts before syncing
+              await _checkForConflicts(batch, conflictedIncidents);
+              
+              // Remove conflicted incidents from the batch
+              final nonConflictedBatch = batch.where(
+                (incident) => !conflictedIncidents.any(
+                  (conflicted) => conflicted.localId == incident.localId
+                )
+              ).toList();
+              
+              if (nonConflictedBatch.isEmpty) {
+                print('All incidents in this batch have conflicts, skipping batch');
+                continue;
+              }
+              
+              final body = jsonEncode(nonConflictedBatch.map((i) => i.toJson()).toList());
               final resp = await _makeAuthorizedRequest(
                 method: 'POST',
                 endpoint: 'incidents/sync/',
@@ -559,10 +627,15 @@ class ApiService {
                 for (var item in data) {
                   syncedIncidents.add(Incident.fromJson(item));
                 }
-                print('Successfully synced batch of ${batch.length} incidents without photos');
+                print('Successfully synced batch of ${nonConflictedBatch.length} incidents without photos');
+                
+                // Update sync progress
+                final progress = (syncedIncidents.length + failedIncidents.length + conflictedIncidents.length) / 
+                    localIncidents.length;
+                await _saveSyncStatus('syncing', 'Syncing in progress', progress);
               } else {
                 print('Failed to sync batch: ${resp.statusCode} ${resp.body}');
-                failedIncidents.addAll(batch);
+                failedIncidents.addAll(nonConflictedBatch);
               }
             } catch (e) {
               print('Error syncing batch: $e');
@@ -578,9 +651,41 @@ class ApiService {
       // Then sync incidents with photos one by one
       if (incidentsWithPhotos.isNotEmpty) {
         print('Syncing ${incidentsWithPhotos.length} incidents with photos');
+        await _saveSyncStatus('syncing', 'Syncing incidents with photos');
+        
+        // Sort by file size if possible (smallest first for faster initial progress)
+        incidentsWithPhotos.sort((a, b) {
+          if (a.photo == null || b.photo == null) return 0;
+          try {
+            final fileA = File(a.photo!);
+            final fileB = File(b.photo!);
+            if (fileA.existsSync() && fileB.existsSync()) {
+              return fileA.lengthSync().compareTo(fileB.lengthSync());
+            }
+          } catch (e) {
+            // Ignore errors, just use original order
+          }
+          return 0;
+        });
+        
         for (final incident in incidentsWithPhotos) {
           try {
             print('Syncing incident with photo: ${incident.title}');
+            
+            // Check for conflicts
+            bool hasConflict = false;
+            try {
+              hasConflict = await _checkIncidentForConflict(incident);
+              if (hasConflict) {
+                print('Conflict detected for incident ${incident.localId}, adding to conflicted list');
+                conflictedIncidents.add(incident);
+                continue;
+              }
+            } catch (e) {
+              print('Error checking for conflicts: $e');
+              // Continue with sync attempt even if conflict check fails
+            }
+            
             // Check if the photo file exists
             final file = File(incident.photo!);
             if (!await file.exists()) {
@@ -607,6 +712,11 @@ class ApiService {
               syncedIncidents.add(syncedIncident);
               print('Successfully synced incident with photo');
             }
+            
+            // Update sync progress
+            final progress = (syncedIncidents.length + failedIncidents.length + conflictedIncidents.length) / 
+                localIncidents.length;
+            await _saveSyncStatus('syncing', 'Syncing in progress', progress);
           } catch (e) {
             failedIncidents.add(incident);
             print('Error syncing individual incident with photo: $e');
@@ -614,17 +724,202 @@ class ApiService {
         }
       }
       
-      print('Sync complete. Synced: ${syncedIncidents.length}, Failed: ${failedIncidents.length}');
+      // Handle conflicts if any
+      if (conflictedIncidents.isNotEmpty) {
+        print('Resolving ${conflictedIncidents.length} conflicted incidents');
+        await _saveSyncStatus('resolving_conflicts', 'Resolving conflicts');
+        
+        for (final incident in conflictedIncidents) {
+          try {
+            final resolvedIncident = await _resolveConflict(incident);
+            if (resolvedIncident != null) {
+              syncedIncidents.add(resolvedIncident);
+              print('Successfully resolved and synced conflicted incident: ${incident.localId}');
+            } else {
+              failedIncidents.add(incident);
+              print('Failed to resolve conflict for incident: ${incident.localId}');
+            }
+          } catch (e) {
+            failedIncidents.add(incident);
+            print('Error resolving conflict: $e');
+          }
+        }
+      }
+      
+      print('Sync complete. Synced: ${syncedIncidents.length}, Failed: ${failedIncidents.length}, Conflicts: ${conflictedIncidents.length}');
+      
+      // Save last sync timestamp
+      await _saveLastSyncTimestamp();
+      
+      // Update sync status based on results
+      if (failedIncidents.isEmpty && conflictedIncidents.isEmpty) {
+        await _saveSyncStatus('success', 'Sync completed successfully');
+      } else if (syncedIncidents.isNotEmpty) {
+        await _saveSyncStatus('partial', 'Some items failed to sync');
+      } else {
+        await _saveSyncStatus('error', 'Failed to sync any incidents');
+      }
       
       // If all incidents failed, throw an exception
-      if (syncedIncidents.isEmpty && failedIncidents.isNotEmpty) {
+      if (syncedIncidents.isEmpty && (failedIncidents.isNotEmpty || conflictedIncidents.isNotEmpty)) {
         throw Exception('Failed to sync any incidents');
       }
       
       return syncedIncidents;
     } catch (e) {
       print('Error in syncIncidents: $e');
+      await _saveSyncStatus('error', 'Sync error: ${e.toString()}');
       throw Exception('Failed to sync incidents: $e');
     }
+  }
+
+  // Check for conflicts before syncing
+  Future<void> _checkForConflicts(List<Incident> incidents, List<Incident> conflictedIncidents) async {
+    for (final incident in incidents) {
+      try {
+        if (await _checkIncidentForConflict(incident)) {
+          conflictedIncidents.add(incident);
+        }
+      } catch (e) {
+        print('Error checking for conflict: $e');
+        // Continue with next incident
+      }
+    }
+  }
+
+  // Check if a single incident has a conflict with server version
+  Future<bool> _checkIncidentForConflict(Incident incident) async {
+    // Skip conflict check for new incidents
+    if (incident.id == null) return false;
+    
+    try {
+      final resp = await _makeAuthorizedRequest(
+        method: 'GET',
+        endpoint: 'incidents/${incident.id}/',
+      );
+      
+      if (resp.statusCode == 200) {
+        final serverIncident = Incident.fromJson(jsonDecode(resp.body));
+        return _conflictService.hasConflict(incident, serverIncident);
+      }
+    } catch (e) {
+      print('Error fetching server incident for conflict check: $e');
+      // If we can't check, assume no conflict
+    }
+    
+    return false;
+  }
+
+  // Resolve a conflict between local and server versions
+  Future<Incident?> _resolveConflict(Incident localIncident) async {
+    try {
+      // Skip if no server ID
+      if (localIncident.id == null) return null;
+      
+      // Get server version
+      final resp = await _makeAuthorizedRequest(
+        method: 'GET',
+        endpoint: 'incidents/${localIncident.id}/',
+      );
+      
+      if (resp.statusCode == 200) {
+        final serverIncident = Incident.fromJson(jsonDecode(resp.body));
+        
+        // Resolve the conflict
+        final resolvedIncident = await _conflictService.resolveIncidentConflict(
+          localIncident, 
+          serverIncident
+        );
+        
+        // If the resolved version matches the server version, we're done
+        if (resolvedIncident.title == serverIncident.title && 
+            resolvedIncident.description == serverIncident.description) {
+          return resolvedIncident;
+        }
+        
+        // Otherwise, update the server with our resolved version
+        final updateResp = await _makeAuthorizedRequest(
+          method: 'PUT',
+          endpoint: 'incidents/${localIncident.id}/',
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(resolvedIncident.toJson()),
+        );
+        
+        if (updateResp.statusCode == 200) {
+          return Incident.fromJson(jsonDecode(updateResp.body));
+        } else {
+          print('Failed to update server with resolved incident: ${updateResp.statusCode}');
+          return null;
+        }
+      } else {
+        print('Failed to get server incident: ${resp.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error resolving conflict: $e');
+      return null;
+    }
+  }
+
+  // Save the last successful sync timestamp
+  Future<void> _saveLastSyncTimestamp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now().toIso8601String();
+      await prefs.setString(_lastSyncKey, now);
+      print('Saved last sync timestamp: $now');
+    } catch (e) {
+      print('Error saving sync timestamp: $e');
+    }
+  }
+
+  // Get the last successful sync timestamp
+  Future<DateTime?> getLastSyncTimestamp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getString(_lastSyncKey);
+      if (timestamp != null) {
+        return DateTime.parse(timestamp);
+      }
+    } catch (e) {
+      print('Error getting sync timestamp: $e');
+    }
+    return null;
+  }
+
+  // Save sync status for persistence across app restarts
+  Future<void> _saveSyncStatus(String status, String message, [double progress = 0.0]) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final statusData = jsonEncode({
+        'status': status,
+        'message': message,
+        'progress': progress,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      await prefs.setString(_syncStatusKey, statusData);
+      print('Saved sync status: $status - $message');
+    } catch (e) {
+      print('Error saving sync status: $e');
+    }
+  }
+
+  // Get the current sync status
+  Future<Map<String, dynamic>> getSyncStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final statusJson = prefs.getString(_syncStatusKey);
+      if (statusJson != null) {
+        return jsonDecode(statusJson);
+      }
+    } catch (e) {
+      print('Error getting sync status: $e');
+    }
+    return {
+      'status': 'unknown',
+      'message': '',
+      'progress': 0.0,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
   }
 }

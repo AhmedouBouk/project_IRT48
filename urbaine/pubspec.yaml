@@ -68,6 +68,9 @@ dependencies:
   lottie: 
   animated_splash_screen: 
   url_launcher:
+  flutter_image_compress: ^2.4.0
+  shared_preferences: ^2.5.3
+  network_info_plus: ^6.1.4
 
 dev_dependencies:
   flutter_native_splash:
