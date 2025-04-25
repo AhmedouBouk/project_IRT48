@@ -4,7 +4,9 @@ import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/animated_splash_screen.dart';
+import 'theme/app_theme.dart';
 
+/// Main application widget that sets up the theme and routing
 class UrbanIncidentApp extends StatelessWidget {
   const UrbanIncidentApp({Key? key}) : super(key: key);
 
@@ -12,24 +14,8 @@ class UrbanIncidentApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Urban Incident Reporter',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2196F3),
-          brightness: Brightness.light,
-        ),
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        appBarTheme: const AppBarTheme(
-          elevation: 0,
-          backgroundColor: Color(0xFF2196F3),
-          foregroundColor: Color(0xFFFFFFFF),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-            textStyle: const TextStyle(fontSize: 16),
-          ),
-        ),
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.getTheme(),
       home: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           if (authProvider.isInitializing) {

@@ -1,13 +1,12 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../models/incident.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/connectivity_provider.dart';
-import '../../services/api_service.dart';
+import '../../widgets/gradient_button.dart';
+import '../../widgets/incident_list_item.dart';
+import '../../theme/app_theme.dart';
 
 class OfflineIncidentsScreen extends StatefulWidget {
   const OfflineIncidentsScreen({Key? key}) : super(key: key);
@@ -18,7 +17,6 @@ class OfflineIncidentsScreen extends StatefulWidget {
 
 class _OfflineIncidentsScreenState extends State<OfflineIncidentsScreen> {
   final DateFormat _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
-  bool _isPlaying = false; // if you want TTS, define it or remove TTS logic
 
   @override
   Widget build(BuildContext context) {
@@ -30,42 +28,186 @@ class _OfflineIncidentsScreenState extends State<OfflineIncidentsScreen> {
       body: Consumer<IncidentProvider>(
         builder: (context, incidentProvider, _) {
           if (incidentProvider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Chargement en cours...',
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ],
+              ),
+            );
           }
 
-          // Filter for unsynced incidents
           final unsyncedIncidents = incidentProvider.incidents
               .where((incident) => !incident.isSynced)
               .toList();
 
           if (unsyncedIncidents.isEmpty) {
-            return _buildEmptyState(context);
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.cloud_off, size: 80, color: theme.colorScheme.primary),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('Aucun incident hors ligne',
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Text('Les incidents créés sans connexion apparaîtront ici',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.7)),
+                        textAlign: TextAlign.center),
+                  ],
+                ),
+              ),
+            );
           }
 
           return Column(
             children: [
-              if (isOnline && unsyncedIncidents.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.cloud_off, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Incidents en attente de synchronisation (${unsyncedIncidents.length})',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // Header with sync status
+                    Row(
+                      children: [
+                        _buildSyncStatusIcon(incidentProvider, isOnline),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                unsyncedIncidents.isEmpty
+                                    ? 'Tous les incidents sont synchronisés'
+                                    : 'Incidents non synchronisés (${unsyncedIncidents.length})',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: incidentProvider.isSyncing 
+                                      ? theme.colorScheme.primary 
+                                      : unsyncedIncidents.isEmpty 
+                                          ? Colors.green.shade700 
+                                          : Colors.grey.shade800,
+                                ),
+                              ),
+                              if (!isOnline && unsyncedIncidents.isNotEmpty)
+                                Text(
+                                  'Mode hors ligne - Connectez-vous pour synchroniser',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange.shade800,
+                                  ),
+                                ),
+                              if (incidentProvider.syncStatus == 'error')
+                                Text(
+                                  'Erreur de synchronisation - Nouvelle tentative en cours',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.red.shade700,
+                                  ),
+                                ),
+                              if (incidentProvider.syncStatus == 'retrying')
+                                Text(
+                                  'Nouvelle tentative de synchronisation...',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange.shade800,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (unsyncedIncidents.isNotEmpty)
+                          SizedBox(
+                            height: 40,
+                            width: 150, // Fixed width to prevent layout issues
+                            child: GradientButton(
+                              onPressed: (isOnline && !incidentProvider.isSyncing)
+                                  ? () => _syncIncidents(incidentProvider)
+                                  : null,
+                              isLoading: incidentProvider.isSyncing,
+                              width: 150, // Set explicit width on GradientButton
+                              startColor: theme.colorScheme.primary,
+                              endColor: theme.colorScheme.secondary,
+                              child: Text(
+                                'Synchroniser',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    
+                    // Progress indicator for syncing
+                    if (incidentProvider.isSyncing)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Column(
+                          children: [
+                            LinearProgressIndicator(
+                              value: incidentProvider.syncProgress,
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                              minHeight: 6,
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Synchronisation en cours... ${(incidentProvider.syncProgress * 100).toInt()}%',
+                                  style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.sync, size: 16),
-                        label: const Text('Synchroniser'),
-                        onPressed: incidentProvider.isSyncing
-                            ? null
-                            : () => _syncIncidents(incidentProvider),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                      
+                    // Success message
+                    if (incidentProvider.syncStatus == 'success' && !incidentProvider.isSyncing)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.green.shade700, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Synchronisation réussie',
+                                  style: TextStyle(color: Colors.green.shade700, fontSize: 13),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -75,11 +217,21 @@ class _OfflineIncidentsScreenState extends State<OfflineIncidentsScreen> {
                   padding: const EdgeInsets.all(12),
                   itemCount: unsyncedIncidents.length,
                   itemBuilder: (context, index) {
-                    final inc = unsyncedIncidents[index];
-                    return _OfflineIncidentListItem(
-                      incident: inc,
+                    final incident = unsyncedIncidents[index];
+                    return IncidentListItem(
+                      incident: incident,
                       dateFormat: _dateFormat,
-                      // if you want TTS for offline items too, pass a TTS method
+                      showSyncStatus: true,
+                      customActions: [
+                        IconButton(
+                          icon: const Icon(Icons.sync),
+                          tooltip: 'Synchroniser cet incident',
+                          onPressed: isOnline ? () {
+                            // Individual sync functionality could be added here
+                            _syncIncidents(incidentProvider);
+                          } : null,
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -91,374 +243,62 @@ class _OfflineIncidentsScreenState extends State<OfflineIncidentsScreen> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.cloud_off, size: 80, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
-            'Aucun incident hors ligne',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Les incidents créés hors ligne apparaîtront ici',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
+  Widget _buildSyncStatusIcon(IncidentProvider incidentProvider, bool isOnline) {
+    if (incidentProvider.isSyncing) {
+      return SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+        ),
+      );
+    }
+    
+    if (!isOnline) {
+      return Icon(Icons.cloud_off, color: Colors.orange.shade700);
+    }
+    
+    if (incidentProvider.syncStatus == 'error') {
+      return Icon(Icons.error_outline, color: Colors.red.shade700);
+    }
+    
+    if (incidentProvider.syncStatus == 'success') {
+      return Icon(Icons.cloud_done, color: Colors.green.shade700);
+    }
+    
+    if (incidentProvider.unsyncedIncidents.isEmpty) {
+      return Icon(Icons.cloud_done, color: Colors.green.shade700);
+    }
+    
+    return Icon(Icons.cloud_upload, color: Colors.grey.shade700);
   }
 
-  Future<void> _syncIncidents(IncidentProvider incidentProvider) async {
+  Future<void> _syncIncidents(IncidentProvider provider) async {
+    // Show sync message
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Synchronisation des incidents en cours...'),
+        content: Text('Synchronisation en cours...'),
         duration: Duration(seconds: 2),
       ),
     );
 
-    await incidentProvider.syncIncidents();
-    if (!mounted) return;
+    // Attempt synchronization
+    final success = await provider.syncIncidents();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          incidentProvider.error != null
-              ? 'Erreur de synchronisation: ${incidentProvider.error}'
-              : 'Synchronisation terminée avec succès',
-        ),
-        backgroundColor: incidentProvider.error != null ? Colors.red : Colors.green,
-      ),
-    );
-  }
-}
-
-// Single item for unsynced incidents
-class _OfflineIncidentListItem extends StatefulWidget {
-  final Incident incident;
-  final DateFormat dateFormat;
-
-  const _OfflineIncidentListItem({
-    Key? key,
-    required this.incident,
-    required this.dateFormat,
-  }) : super(key: key);
-
-  @override
-  State<_OfflineIncidentListItem> createState() => _OfflineIncidentListItemState();
-}
-
-class _OfflineIncidentListItemState extends State<_OfflineIncidentListItem> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final inc = widget.incident;
-    final dateText = (inc.createdAt != null) ? widget.dateFormat.format(inc.createdAt!) : '';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Card(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: theme.colorScheme.primary.withOpacity(0.5),
-            width: 1.5,
-          ),
-        ),
-        child: Column(
-          children: [
-            ListTile(
-              contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              leading: _buildThumbnail(inc),
-              title: Text(
-                inc.title,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.access_time,
-                        size: 16, color: theme.colorScheme.onSurface.withOpacity(0.6)),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        dateText,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (inc.latitude != 0.0 && inc.longitude != 0.0)
-                      IconButton(
-                        constraints: const BoxConstraints(),
-                        padding: EdgeInsets.zero,
-                        iconSize: 20,
-                        icon: Icon(
-                          Icons.location_on,
-                          color: theme.colorScheme.primary,
-                        ),
-                        tooltip: 'Ouvrir dans Google Maps',
-                        onPressed: () => _openInMaps(inc.latitude, inc.longitude),
-                      ),
-                  ],
-                ),
-              ),
-              trailing: IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: theme.colorScheme.outline.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Icon(
-                    _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                onPressed: () => setState(() => _expanded = !_expanded),
-              ),
-              onTap: () => setState(() => _expanded = !_expanded),
-            ),
-            if (_expanded) _buildExpandedDescription(inc),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExpandedDescription(Incident inc) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withOpacity(0.5),
-        border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.2),
-          ),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Type: ${inc.incidentTypeLabel}',
-            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Description',
-            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.2),
-              ),
-            ),
-            child: Text(
-              inc.description,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openInMaps(double lat, double lng) async {
-    final url = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (!mounted) return;
+    // Show result feedback if the context is still valid
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossible d\'ouvrir Google Maps.')),
-      );
-    }
-  }
-
-  Widget _buildThumbnail(Incident inc) {
-    const size = 70.0;
-    final borderRadius = BorderRadius.circular(12);
-
-    if (inc.photo == null) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: Colors.grey[200], borderRadius: borderRadius),
-        child: const Icon(Icons.image_not_supported, color: Colors.grey),
-      );
-    }
-
-    if (inc.photo!.startsWith('http')) {
-      return _buildImageContainer(
-        ClipRRect(
-          borderRadius: borderRadius,
-          child: Image.network(
-            inc.photo!,
-            fit: BoxFit.cover,
-            width: size,
-            height: size,
-            errorBuilder: (_, __, ___) => _brokenImage(size, borderRadius),
+        SnackBar(
+          content: Text(
+            success 
+                ? 'Synchronisation terminée avec succès' 
+                : 'Échec de la synchronisation. Réessayez ultérieurement.'
           ),
+          backgroundColor: success ? Colors.green.shade700 : Colors.red.shade700,
+          duration: const Duration(seconds: 3),
         ),
-        inc.photo!,
-        size,
-        borderRadius,
       );
     }
-
-    try {
-      return _buildImageContainer(
-        ClipRRect(
-          borderRadius: borderRadius,
-          child: Image.file(
-            File(inc.photo!),
-            fit: BoxFit.cover,
-            width: size,
-            height: size,
-            errorBuilder: (_, __, ___) => _brokenImage(size, borderRadius),
-          ),
-        ),
-        inc.photo!,
-        size,
-        borderRadius,
-      );
-    } catch (_) {
-      return _brokenImage(size, borderRadius);
-    }
-  }
-
-  Widget _buildImageContainer(
-    Widget child,
-    String pathOrUrl,
-    double size,
-    BorderRadius borderRadius,
-  ) {
-    return GestureDetector(
-      onTap: () => _showFullImageDialog(pathOrUrl),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          borderRadius: borderRadius,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            child,
-            Positioned(
-              right: 4,
-              bottom: 4,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.zoom_in, color: Colors.white, size: 16),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _brokenImage(double size, BorderRadius borderRadius) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: borderRadius),
-      child: const Icon(Icons.broken_image, color: Colors.grey),
-    );
-  }
-
-  void _showFullImageDialog(String pathOrUrl) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Text('Image de l\'incident', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: pathOrUrl.startsWith('http')
-                      ? Image.network(
-                          pathOrUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) =>
-                              const Center(child: Icon(Icons.broken_image, size: 80)),
-                        )
-                      : Image.file(
-                          File(pathOrUrl),
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) =>
-                              const Center(child: Icon(Icons.broken_image, size: 80)),
-                        ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
   }
 }
